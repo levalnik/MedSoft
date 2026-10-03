@@ -22,7 +22,7 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("HospitalInformationSystem.Domain.MedicalWorkers.MedicalWorker", b =>
+            modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.MedicalWorkerDbo", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")

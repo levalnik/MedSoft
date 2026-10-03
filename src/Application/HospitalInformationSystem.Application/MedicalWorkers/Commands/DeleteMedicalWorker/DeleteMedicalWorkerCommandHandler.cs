@@ -13,6 +13,7 @@ public sealed class DeleteMedicalWorkerCommandHandler(
         var worker = await repository.FindAsync(request.Id, tracking: true, cancellationToken)
             ?? throw new EntityNotFoundException("Медработник не найден.");
         worker.MarkAsDeleted(timeProvider.GetUtcNow());
+        await repository.UpdateAsync(worker, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

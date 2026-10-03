@@ -4,7 +4,19 @@ namespace HospitalInformationSystem.Domain.MedicalWorkers;
 
 public sealed class MedicalWorker
 {
-    private MedicalWorker() { }
+    // Восстановление сохранённого состояния без нового Id или изменения времени.
+    public MedicalWorker(
+        Guid id, string firstName, string lastName, string position, bool isDeleted,
+        DateTimeOffset createdAtUtc, DateTimeOffset updatedAtUtc)
+    {
+        Id = id;
+        FirstName = Validate(firstName, "Имя");
+        LastName = Validate(lastName, "Фамилия");
+        Position = Validate(position, "Должность");
+        IsDeleted = isDeleted;
+        CreatedAtUtc = createdAtUtc.ToUniversalTime();
+        UpdatedAtUtc = updatedAtUtc.ToUniversalTime();
+    }
 
     public Guid Id { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
@@ -15,12 +27,8 @@ public sealed class MedicalWorker
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
     public static MedicalWorker Create(
-        string firstName, string lastName, string position, DateTimeOffset now)
-    {
-        var worker = new MedicalWorker { Id = Guid.NewGuid(), CreatedAtUtc = now.ToUniversalTime() };
-        worker.Update(firstName, lastName, position, now);
-        return worker;
-    }
+        string firstName, string lastName, string position, DateTimeOffset now) =>
+        new(Guid.NewGuid(), firstName, lastName, position, false, now, now);
 
     public void Update(string firstName, string lastName, string position, DateTimeOffset now)
     {

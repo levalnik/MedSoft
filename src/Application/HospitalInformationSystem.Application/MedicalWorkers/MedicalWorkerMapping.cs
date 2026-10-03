@@ -1,10 +1,13 @@
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Domain.MedicalWorkers;
+using Riok.Mapperly.Abstractions;
 
 namespace HospitalInformationSystem.Application.MedicalWorkers;
 
-internal static class MedicalWorkerMapping
+[Mapper]
+internal static partial class MedicalWorkerMapping
 {
-    public static MedicalWorkerDto ToDto(this MedicalWorker worker) =>
-        new(worker.Id, worker.FirstName, worker.LastName, worker.Position, worker.IsDeleted);
+    [MapperIgnoreSource(nameof(MedicalWorker.CreatedAtUtc))]
+    [MapperIgnoreSource(nameof(MedicalWorker.UpdatedAtUtc))]
+    public static partial MedicalWorkerDto ToDto(this MedicalWorker worker);
 }

@@ -2,7 +2,7 @@ using FluentValidation;
 using HospitalInformationSystem.Application.Common;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace HospitalInformationSystem.Application;
+namespace HospitalInformationSystem.Application.DI;
 
 public static class DependencyInjection
 {

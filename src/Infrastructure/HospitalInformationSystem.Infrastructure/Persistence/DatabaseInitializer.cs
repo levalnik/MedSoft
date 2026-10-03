@@ -1,4 +1,5 @@
 using HospitalInformationSystem.Domain.MedicalWorkers;
+using HospitalInformationSystem.Infrastructure.Persistence.Mappings;
 using Microsoft.EntityFrameworkCore;
 
 namespace HospitalInformationSystem.Infrastructure.Persistence;
@@ -14,10 +15,10 @@ public sealed class DatabaseInitializer(HospitalDbContext db, TimeProvider timeP
         var deleted = MedicalWorker.Create("Анна", "Кузнецова", "Медицинская сестра", now);
         deleted.MarkAsDeleted(now);
         db.MedicalWorkers.AddRange(
-            MedicalWorker.Create("Алексей", "Иванов", "Врач-терапевт", now),
-            MedicalWorker.Create("Мария", "Петрова", "Врач-хирург", now),
-            MedicalWorker.Create("Дмитрий", "Смирнов", "Врач-анестезиолог", now),
-            deleted);
+            MedicalWorker.Create("Алексей", "Иванов", "Врач-терапевт", now).ToDbo(),
+            MedicalWorker.Create("Мария", "Петрова", "Врач-хирург", now).ToDbo(),
+            MedicalWorker.Create("Дмитрий", "Смирнов", "Врач-анестезиолог", now).ToDbo(),
+            deleted.ToDbo());
         await db.SaveChangesAsync(cancellationToken);
     }
 }

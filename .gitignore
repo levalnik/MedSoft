@@ -10,6 +10,3 @@ artifacts/
 
 # Markdown documentation is kept locally in docs/
 *.md
-
-docs/
-artifacts/

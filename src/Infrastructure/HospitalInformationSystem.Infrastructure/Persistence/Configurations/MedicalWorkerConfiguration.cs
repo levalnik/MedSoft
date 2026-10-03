@@ -1,12 +1,12 @@
-using HospitalInformationSystem.Domain.MedicalWorkers;
+using HospitalInformationSystem.Infrastructure.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace HospitalInformationSystem.Infrastructure.Persistence.Configurations;
 
-public sealed class MedicalWorkerConfiguration : IEntityTypeConfiguration<MedicalWorker>
+public sealed class MedicalWorkerConfiguration : IEntityTypeConfiguration<MedicalWorkerDbo>
 {
-    public void Configure(EntityTypeBuilder<MedicalWorker> builder)
+    public void Configure(EntityTypeBuilder<MedicalWorkerDbo> builder)
     {
         builder.ToTable("medical_workers", table =>
         {

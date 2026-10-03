@@ -41,7 +41,9 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
-        (await db.MedicalWorkers.AsNoTracking().SingleAsync(x => x.Id == worker.Id)).IsDeleted.Should().BeTrue();
+        var saved = await db.MedicalWorkers.AsNoTracking().SingleAsync(x => x.Id == worker.Id);
+        saved.IsDeleted.Should().BeTrue();
+        saved.Position.Should().Be("Врач-хирург");
     }
 
     [Theory]

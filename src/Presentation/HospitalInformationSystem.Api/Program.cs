@@ -1,5 +1,6 @@
 using HospitalInformationSystem.Api.Middleware;
 using HospitalInformationSystem.Application;
+using HospitalInformationSystem.Application.DI;
 using HospitalInformationSystem.Infrastructure;
 using HospitalInformationSystem.Infrastructure.Persistence;
 
