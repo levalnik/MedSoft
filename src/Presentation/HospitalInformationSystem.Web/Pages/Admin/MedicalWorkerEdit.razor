@@ -1,0 +1,123 @@
+@page "/admin/medical-workers/new"
+@page "/admin/medical-workers/{Id:guid}"
+@inject MedicalWorkersApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "Новый медработник" : "Карточка медработника") · Учебная HIS</PageTitle>
+<a class="back-link" href="/admin/medical-workers"><Icon Name="arrow" /> К списку медработников</a>
+<div class="page-heading"><div><h1>@(Id is null ? "Новый медработник" : "Редактирование медработника")</h1><p>Основные данные сотрудника лечебного учреждения</p></div></div>
+<ErrorAlert Message="@_error" />
+@if (_loading)
+{
+  <div class="surface empty-state" role="status">Загрузка карточки…</div>
+}
+else if (_model is not null)
+{
+  <div class="profile-layout">
+    <aside class="profile-panel" aria-label="Сведения о сотруднике">
+      <span class="eyebrow">КАРТОЧКА СОТРУДНИКА</span>
+      <div class="profile-avatar"><Icon Name="patients" /></div>
+      <h2>@(string.IsNullOrWhiteSpace(_model.LastName) ? "Новый сотрудник" : _model.LastName)<span>@_model.FirstName</span></h2>
+      <p class="profile-position">@(string.IsNullOrWhiteSpace(_model.Position) ? "Должность ещё не указана" : _model.Position)</p>
+      <WorkerStatus IsDeleted="@(_worker?.IsDeleted ?? false)" />
+      <div class="profile-note"><Icon Name="record" /><p>Актуальные сведения помогают поддерживать порядок в реестре учреждения.</p></div>
+    </aside>
+    <section class="surface edit-surface" aria-label="Редактирование данных">
+      <EditForm Model="_model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <fieldset disabled="@_busy">
+          <div class="form-section">
+            <div class="section-title"><span class="step-number">01</span><div><h2>Основные сведения</h2><p>Укажите имя и фамилию сотрудника.</p></div></div>
+            <div class="form-grid">
+              <div><label for="lastName">Фамилия</label><InputText id="lastName" class="form-control" @bind-Value="_model.LastName" maxlength="24" placeholder="Например, Иванов" autocomplete="family-name" /><ValidationMessage For="() => _model.LastName" /></div>
+              <div><label for="firstName">Имя</label><InputText id="firstName" class="form-control" @bind-Value="_model.FirstName" maxlength="24" placeholder="Например, Алексей" autocomplete="given-name" /><ValidationMessage For="() => _model.FirstName" /></div>
+            </div>
+          </div>
+          <div class="form-section">
+            <div class="section-title"><span class="step-number">02</span><div><h2>Работа в учреждении</h2><p>Выберите подсказку или введите свою должность.</p></div></div>
+            <div><label for="position">Должность</label><InputText id="position" class="form-control" @bind-Value="_model.Position" list="positions" maxlength="24" placeholder="Например, врач-терапевт" /><ValidationMessage For="() => _model.Position" /><datalist id="positions"><option>Врач-терапевт</option><option>Врач-хирург</option><option>Врач-анестезиолог</option><option>Медицинская сестра</option></datalist></div>
+            <p class="field-hint">Все поля обязательны. От 3 до 24 символов в каждом поле.</p>
+          </div>
+          <div class="form-actions">
+            <a class="btn btn-light" href="/admin/medical-workers">Отмена</a>
+            <button type="submit" class="btn btn-primary"><Icon Name="check" /> @(_busy ? "Сохранение…" : "Сохранить")</button>
+          </div>
+        </fieldset>
+      </EditForm>
+      @if (_worker is { IsDeleted: false })
+      {
+        <div class="delete-section"><div><strong>Сотрудник больше не работает?</strong><p>Можно пометить его запись как удалённую.</p></div><button type="button" class="btn btn-soft-danger" disabled="@_busy" @onclick="() => _confirmDelete = true"><Icon Name="delete" /> Пометить удалённым</button></div>
+      }
+      @if (_confirmDelete)
+      {
+        <ConfirmDelete Worker="_worker" Busy="_busy" OnConfirm="DeleteAsync" OnCancel="() => _confirmDelete = false" />
+      }
+    </section>
+  </div>
+}
+else
+{
+  <button class="btn btn-outline-primary" @onclick="LoadAsync">Повторить загрузку</button>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private WorkerForm? _model;
+    private MedicalWorkerDto? _worker;
+    private string? _error;
+    private bool _loading;
+    private bool _busy;
+    private bool _confirmDelete;
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _worker = null;
+        _model = null;
+        _confirmDelete = false;
+        try
+        {
+            if (Id is { } id) _worker = await Api.GetAsync(id);
+            _model = new WorkerForm { FirstName = _worker?.FirstName ?? "", LastName = _worker?.LastName ?? "", Position = _worker?.Position ?? "" };
+        }
+        catch (ApiException e) { _error = e.Message; }
+        catch (HttpRequestException) { _error = "Не удалось связаться с сервером."; }
+        catch (TaskCanceledException) { _error = "Сервер не ответил вовремя. Повторите попытку."; }
+        finally { _loading = false; }
+    }
+
+    private Task SaveAsync() => ExecuteAsync(async () =>
+    {
+        if (_model is null) return;
+        await Api.SaveAsync(Id, new SaveMedicalWorkerRequest(_model.FirstName, _model.LastName, _model.Position));
+    });
+
+    private Task DeleteAsync() => ExecuteAsync(async () =>
+    {
+        if (Id is { } id) await Api.DeleteAsync(id);
+    });
+
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        if (_busy) return;
+        _busy = true;
+        _error = null;
+        try { await action(); Navigation.NavigateTo("/admin/medical-workers"); }
+        catch (ApiException e) { _error = e.Message; }
+        catch (HttpRequestException) { _error = "Не удалось связаться с сервером. Введённые данные сохранены в форме."; }
+        catch (TaskCanceledException) { _error = "Сервер не ответил вовремя. Проверьте список перед повторным сохранением."; }
+        finally { _busy = false; }
+    }
+
+    private sealed class WorkerForm
+    {
+        [Required(ErrorMessage = "Укажите имя."), StringLength(24, MinimumLength = 3, ErrorMessage = "Имя: от 3 до 24 символов.")]
+        public string FirstName { get; set; } = "";
+        [Required(ErrorMessage = "Укажите фамилию."), StringLength(24, MinimumLength = 3, ErrorMessage = "Фамилия: от 3 до 24 символов.")]
+        public string LastName { get; set; } = "";
+        [Required(ErrorMessage = "Укажите должность."), StringLength(24, MinimumLength = 3, ErrorMessage = "Должность: от 3 до 24 символов.")]
+        public string Position { get; set; } = "";
+    }
+}

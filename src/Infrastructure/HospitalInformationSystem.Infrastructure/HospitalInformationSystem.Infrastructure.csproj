@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Application/HospitalInformationSystem.Domain/HospitalInformationSystem.Domain.csproj" />
+    <ProjectReference Include="../../Application/HospitalInformationSystem.Application/HospitalInformationSystem.Application.csproj" />
+  </ItemGroup>
+</Project>

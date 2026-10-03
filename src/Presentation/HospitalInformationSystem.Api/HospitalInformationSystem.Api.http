@@ -1,0 +1,40 @@
+@baseUrl = http://localhost:5200
+
+### Проверка подключения к БД
+GET {{baseUrl}}/health/ready
+
+### Список включая удалённых
+GET {{baseUrl}}/api/medical-workers?includeDeleted=true
+
+### Создать; скопировать id ответа в workerId ниже
+POST {{baseUrl}}/api/medical-workers
+Content-Type: application/json
+
+{
+  "firstName": "Александр",
+  "lastName": "Орлов",
+  "position": "Врач-терапевт"
+}
+
+### Подставьте id созданной записи
+@workerId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/medical-workers/{{workerId}}
+
+### Изменить
+PUT {{baseUrl}}/api/medical-workers/{{workerId}}
+Content-Type: application/json
+
+{
+  "firstName": "Александр",
+  "lastName": "Орлов",
+  "position": "Врач-хирург"
+}
+
+### Пометить удалённым
+DELETE {{baseUrl}}/api/medical-workers/{{workerId}}
+
+### 400 ValidationProblemDetails
+POST {{baseUrl}}/api/medical-workers
+Content-Type: application/json
+
+{ "firstName": "А", "lastName": "Орлов", "position": "Врач" }

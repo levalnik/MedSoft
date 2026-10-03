@@ -1,0 +1,20 @@
+@if (Worker is not null)
+{
+  <div class="confirm-panel" role="alertdialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+    <div>
+      <strong id="delete-title">Пометить медработника как удалённого?</strong>
+      <p id="delete-description">@Worker.LastName @Worker.FirstName — запись останется в системе.</p>
+    </div>
+    <div class="button-row">
+      <button class="btn btn-danger" disabled="@Busy" @onclick="OnConfirm">@(Busy ? "Удаление…" : "Подтвердить удаление")</button>
+      <button class="btn btn-light" disabled="@Busy" @onclick="OnCancel">Отмена</button>
+    </div>
+  </div>
+}
+
+@code {
+    [Parameter] public MedicalWorkerDto? Worker { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}

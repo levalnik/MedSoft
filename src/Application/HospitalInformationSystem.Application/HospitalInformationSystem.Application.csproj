@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../HospitalInformationSystem.Domain/HospitalInformationSystem.Domain.csproj" />
+    <ProjectReference Include="../HospitalInformationSystem.Contracts/HospitalInformationSystem.Contracts.csproj" />
+  </ItemGroup>
+</Project>

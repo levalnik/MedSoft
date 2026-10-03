@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+.vscode/
+.DS_Store
+TestResults/
+artifacts/
+.env
+
+# Markdown documentation is kept locally in docs/
+*.md
+
+docs/
+artifacts/

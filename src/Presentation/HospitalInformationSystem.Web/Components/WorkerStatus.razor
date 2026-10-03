@@ -1,0 +1,5 @@
+<span class="status @(IsDeleted ? "status-deleted" : "status-active")"><span class="status-dot"></span>@(IsDeleted ? "Удалён" : "Активен")</span>
+
+@code {
+    [Parameter] public bool IsDeleted { get; set; }
+}

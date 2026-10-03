@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/Application/">
+    <Project Path="src/Application/HospitalInformationSystem.Domain/HospitalInformationSystem.Domain.csproj" />
+    <Project Path="src/Application/HospitalInformationSystem.Contracts/HospitalInformationSystem.Contracts.csproj" />
+    <Project Path="src/Application/HospitalInformationSystem.Application/HospitalInformationSystem.Application.csproj" />
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="src/Infrastructure/HospitalInformationSystem.Infrastructure/HospitalInformationSystem.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="src/Presentation/HospitalInformationSystem.Api/HospitalInformationSystem.Api.csproj" />
+    <Project Path="src/Presentation/HospitalInformationSystem.Web/HospitalInformationSystem.Web.csproj" />
+  </Folder>
+  <Project Path="tests/HospitalInformationSystem.UnitTests/HospitalInformationSystem.UnitTests.csproj" />
+  <Project Path="tests/HospitalInformationSystem.IntegrationTests/HospitalInformationSystem.IntegrationTests.csproj" />
+</Solution>
