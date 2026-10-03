@@ -1,4 +1,5 @@
 using FluentValidation;
+using HospitalInformationSystem.Application.MedicalWorkers.Rules;
 
 namespace HospitalInformationSystem.Application.MedicalWorkers.Commands.CreateMedicalWorker;
 

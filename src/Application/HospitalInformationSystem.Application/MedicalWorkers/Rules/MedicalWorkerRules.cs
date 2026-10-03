@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace HospitalInformationSystem.Application.MedicalWorkers;
+namespace HospitalInformationSystem.Application.MedicalWorkers.Rules;
 
 internal static class MedicalWorkerRules
 {
