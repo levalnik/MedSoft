@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.Patients.Services;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Contracts.Patients;
@@ -13,7 +14,7 @@ public sealed class UpdatePatientCommandHandler(
     {
         var patient = await repository.FindAsync(request.Id, tracking: true, cancellationToken)
             ?? throw new EntityNotFoundException("Пациент не найден.");
-        patient.Update(request.FirstName, request.LastName, request.MiddleName,
+        PatientService.Update(patient, request.FirstName, request.LastName, request.MiddleName,
             request.BirthDate, request.Sex.ToDomain(), request.Comment, timeProvider.GetUtcNow());
         await repository.UpdateAsync(patient, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);

@@ -1,3 +1,7 @@
+using HospitalInformationSystem.Domain.MedicalRecords.Factories;
+using HospitalInformationSystem.Domain.MedicalRecords.Services;
+using HospitalInformationSystem.Domain.MedicalWorkers.Factories;
+using HospitalInformationSystem.Domain.MedicalWorkers.Services;
 using System;
 using System.Linq;
 using FluentAssertions;
@@ -13,14 +17,14 @@ public sealed class MedicalRecordTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 4, 12, 0, 0, TimeSpan.Zero);
 
-    private static MedicalWorker Author() => MedicalWorker.Create("Алексей", "Иванов", "Врач", Now);
+    private static MedicalWorker Author() => MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now);
 
     [Fact]
     public void Creation_records_patient_and_author_snapshot_in_utc()
     {
         var author = Author();
         var patientId = Guid.NewGuid();
-        var record = MedicalRecord.Create(patientId, author, Now.ToOffset(TimeSpan.FromHours(3)));
+        var record = MedicalRecordFactory.Create(patientId, author, Now.ToOffset(TimeSpan.FromHours(3)));
 
         record.Id.Should().NotBeEmpty();
         record.PatientId.Should().Be(patientId);
@@ -33,8 +37,8 @@ public sealed class MedicalRecordTests
         history.PerformedByNameSnapshot.Should().Be("Иванов Алексей");
         history.PayloadJson.Should().Contain($"\"patientId\":\"{patientId}\"");
 
-        author.Update("Дмитрий", "Петров", "Хирург", Now.AddDays(1));
-        author.MarkAsDeleted(Now.AddDays(2));
+        MedicalWorkerService.Update(author, "Дмитрий", "Петров", "Хирург", Now.AddDays(1));
+        MedicalWorkerService.MarkAsDeleted(author, Now.AddDays(2));
         history.PerformedByNameSnapshot.Should().Be("Иванов Алексей");
         history.PerformedByPositionSnapshot.Should().Be("Врач");
     }
@@ -43,10 +47,10 @@ public sealed class MedicalRecordTests
     public void Replacement_preserves_original_text_and_emits_two_ordered_events_at_same_time()
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var original = record.AddPrescription("Исходное назначение", author, Now.AddMinutes(1));
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var original = MedicalRecordService.AddPrescription(record, "Исходное назначение", author, Now.AddMinutes(1));
         var replacedAt = Now.AddMinutes(2);
-        var replacement = record.ReplacePrescription(original.Id, " Новое назначение ", author, replacedAt);
+        var replacement = MedicalRecordService.ReplacePrescription(record, original.Id, " Новое назначение ", author, replacedAt);
 
         original.Text.Should().Be("Исходное назначение");
         original.CancelledAtUtc.Should().Be(replacedAt);
@@ -71,10 +75,10 @@ public sealed class MedicalRecordTests
     public void Invalid_replacement_does_not_cancel_original_or_append_history(string? text)
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var original = record.AddPrescription("Назначение", author, Now.AddMinutes(1));
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var original = MedicalRecordService.AddPrescription(record, "Назначение", author, Now.AddMinutes(1));
 
-        var replace = () => record.ReplacePrescription(original.Id, text!, author, Now.AddMinutes(2));
+        var replace = () => MedicalRecordService.ReplacePrescription(record, original.Id, text!, author, Now.AddMinutes(2));
 
         replace.Should().Throw<DomainValidationException>();
         original.CancelledAtUtc.Should().BeNull();
@@ -88,10 +92,10 @@ public sealed class MedicalRecordTests
     public void Prescription_boundaries_are_checked_before_changes()
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        record.AddPrescription(new string('а', 3), author, Now);
-        var longPrescription = record.AddPrescription(new string('а', 128), author, Now);
-        var replace = () => record.ReplacePrescription(longPrescription.Id, new string('а', 129), author, Now);
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        MedicalRecordService.AddPrescription(record, new string('а', 3), author, Now);
+        var longPrescription = MedicalRecordService.AddPrescription(record, new string('а', 128), author, Now);
+        var replace = () => MedicalRecordService.ReplacePrescription(record, longPrescription.Id, new string('а', 129), author, Now);
         replace.Should().Throw<DomainValidationException>();
         longPrescription.CancelledAtUtc.Should().BeNull();
         record.Version.Should().Be(3);
@@ -101,11 +105,11 @@ public sealed class MedicalRecordTests
     public void Repeated_cancel_and_replace_of_cancelled_prescription_are_conflicts_without_new_history()
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var prescription = record.AddPrescription("Назначение", author, Now);
-        record.CancelPrescription(prescription.Id, author, Now.AddMinutes(1));
-        Action cancelAgain = () => record.CancelPrescription(prescription.Id, author, Now.AddMinutes(2));
-        var replace = () => record.ReplacePrescription(prescription.Id, "Новое назначение", author, Now.AddMinutes(2));
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var prescription = MedicalRecordService.AddPrescription(record, "Назначение", author, Now);
+        MedicalRecordService.CancelPrescription(record, prescription.Id, author, Now.AddMinutes(1));
+        Action cancelAgain = () => MedicalRecordService.CancelPrescription(record, prescription.Id, author, Now.AddMinutes(2));
+        var replace = () => MedicalRecordService.ReplacePrescription(record, prescription.Id, "Новое назначение", author, Now.AddMinutes(2));
 
         cancelAgain.Should().Throw<BusinessRuleConflictException>();
         replace.Should().Throw<BusinessRuleConflictException>();
@@ -117,10 +121,10 @@ public sealed class MedicalRecordTests
     public void Diagnosis_removal_keeps_historical_data_and_repeated_removal_conflicts()
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
         var definitionId = Guid.NewGuid();
-        var diagnosis = record.AddDiagnosis(definitionId, " I10.00 ", " Гипертензия ", author, Now.AddMinutes(1));
-        record.RemoveDiagnosis(diagnosis.Id, author, Now.AddMinutes(2));
+        var diagnosis = MedicalRecordService.AddDiagnosis(record, definitionId, " I10.00 ", " Гипертензия ", author, Now.AddMinutes(1));
+        MedicalRecordService.RemoveDiagnosis(record, diagnosis.Id, author, Now.AddMinutes(2));
 
         diagnosis.DiagnosisDefinitionId.Should().Be(definitionId);
         diagnosis.DiagnosisCodeSnapshot.Should().Be("I10.00");
@@ -128,7 +132,7 @@ public sealed class MedicalRecordTests
         diagnosis.AddedAtUtc.Should().Be(Now.AddMinutes(1));
         diagnosis.RemovedAtUtc.Should().Be(Now.AddMinutes(2));
         diagnosis.RemovedByMedicalWorkerId.Should().Be(author.Id);
-        Action removeAgain = () => record.RemoveDiagnosis(diagnosis.Id, author, Now.AddMinutes(3));
+        Action removeAgain = () => MedicalRecordService.RemoveDiagnosis(record, diagnosis.Id, author, Now.AddMinutes(3));
         removeAgain.Should().Throw<BusinessRuleConflictException>();
         record.Version.Should().Be(3);
         record.Diagnoses.Should().ContainSingle();
@@ -138,14 +142,14 @@ public sealed class MedicalRecordTests
     public void Child_from_another_record_is_not_found_and_does_not_change_state()
     {
         var author = Author();
-        var first = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var second = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var prescription = first.AddPrescription("Назначение", author, Now);
-        var diagnosis = first.AddDiagnosis(Guid.NewGuid(), "I10.00", "Гипертензия", author, Now);
+        var first = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var second = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var prescription = MedicalRecordService.AddPrescription(first, "Назначение", author, Now);
+        var diagnosis = MedicalRecordService.AddDiagnosis(first, Guid.NewGuid(), "I10.00", "Гипертензия", author, Now);
 
-        Action cancel = () => second.CancelPrescription(prescription.Id, author, Now);
-        Action remove = () => second.RemoveDiagnosis(diagnosis.Id, author, Now);
-        var replace = () => second.ReplacePrescription(prescription.Id, "Изменение", author, Now);
+        Action cancel = () => MedicalRecordService.CancelPrescription(second, prescription.Id, author, Now);
+        Action remove = () => MedicalRecordService.RemoveDiagnosis(second, diagnosis.Id, author, Now);
+        var replace = () => MedicalRecordService.ReplacePrescription(second, prescription.Id, "Изменение", author, Now);
         cancel.Should().Throw<DomainEntityNotFoundException>();
         remove.Should().Throw<DomainEntityNotFoundException>();
         replace.Should().Throw<DomainEntityNotFoundException>();
@@ -157,18 +161,18 @@ public sealed class MedicalRecordTests
     public void Deleted_author_cannot_create_or_change_medical_records()
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var prescription = record.AddPrescription("Назначение", author, Now);
-        var diagnosis = record.AddDiagnosis(Guid.NewGuid(), "I10.00", "Гипертензия", author, Now);
-        author.MarkAsDeleted(Now);
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var prescription = MedicalRecordService.AddPrescription(record, "Назначение", author, Now);
+        var diagnosis = MedicalRecordService.AddDiagnosis(record, Guid.NewGuid(), "I10.00", "Гипертензия", author, Now);
+        MedicalWorkerService.MarkAsDeleted(author, Now);
         var actions = new Action[]
         {
-            () => MedicalRecord.Create(Guid.NewGuid(), author, Now),
-            () => record.AddDiagnosis(Guid.NewGuid(), "I10.00", "Гипертензия", author, Now),
-            () => record.RemoveDiagnosis(diagnosis.Id, author, Now),
-            () => record.AddPrescription("Назначение", author, Now),
-            () => record.CancelPrescription(prescription.Id, author, Now),
-            () => record.ReplacePrescription(prescription.Id, "Новое назначение", author, Now)
+            () => MedicalRecordFactory.Create(Guid.NewGuid(), author, Now),
+            () => MedicalRecordService.AddDiagnosis(record, Guid.NewGuid(), "I10.00", "Гипертензия", author, Now),
+            () => MedicalRecordService.RemoveDiagnosis(record, diagnosis.Id, author, Now),
+            () => MedicalRecordService.AddPrescription(record, "Назначение", author, Now),
+            () => MedicalRecordService.CancelPrescription(record, prescription.Id, author, Now),
+            () => MedicalRecordService.ReplacePrescription(record, prescription.Id, "Новое назначение", author, Now)
         };
 
         foreach (var action in actions) action.Should().Throw<DomainValidationException>();
@@ -181,9 +185,9 @@ public sealed class MedicalRecordTests
     public void Clock_rollback_keeps_events_and_current_state_at_monotonic_utc_time()
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var prescription = record.AddPrescription("Назначение", author, Now.AddMinutes(-1));
-        record.CancelPrescription(prescription.Id, author, Now.AddMinutes(-2));
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var prescription = MedicalRecordService.AddPrescription(record, "Назначение", author, Now.AddMinutes(-1));
+        MedicalRecordService.CancelPrescription(record, prescription.Id, author, Now.AddMinutes(-2));
 
         prescription.CreatedAtUtc.Should().Be(Now);
         prescription.CancelledAtUtc.Should().Be(Now);
@@ -192,15 +196,33 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
+    public void Unordered_restored_history_uses_latest_version_when_clock_moves_backwards()
+    {
+        var author = Author();
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var previous = MedicalRecordService.AddPrescription(record, "Первое назначение", author, Now.AddMinutes(5));
+        record.HistoryEvents = record.HistoryEvents.Reverse().ToArray();
+
+        var next = MedicalRecordService.AddPrescription(record, "Следующее назначение", author, Now.AddMinutes(1));
+
+        next.CreatedAtUtc.Should().Be(previous.CreatedAtUtc);
+        record.Version.Should().Be(3);
+        record.HistoryEvents.Single(x => x.Version == 3).OccurredAtUtc.Should().Be(previous.CreatedAtUtc);
+        var snapshot = HospitalInformationSystem.Application.MedicalRecords.Snapshot.MedicalRecordSnapshotReplay
+            .Build(record, record.HistoryEvents, previous.CreatedAtUtc);
+        snapshot.Prescriptions.Should().HaveCount(2);
+    }
+
+    [Fact]
     public void Current_dto_omits_removed_diagnoses_and_cancelled_prescriptions()
     {
         var author = Author();
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, Now);
-        var removed = record.AddDiagnosis(Guid.NewGuid(), "I10.00", "Гипертензия", author, Now);
-        var active = record.AddDiagnosis(Guid.NewGuid(), "E11.90", "Диабет", author, Now);
-        record.RemoveDiagnosis(removed.Id, author, Now);
-        var cancelled = record.AddPrescription("Исходное назначение", author, Now);
-        var replacement = record.ReplacePrescription(cancelled.Id, "Новое назначение", author, Now);
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
+        var removed = MedicalRecordService.AddDiagnosis(record, Guid.NewGuid(), "I10.00", "Гипертензия", author, Now);
+        var active = MedicalRecordService.AddDiagnosis(record, Guid.NewGuid(), "E11.90", "Диабет", author, Now);
+        MedicalRecordService.RemoveDiagnosis(record, removed.Id, author, Now);
+        var cancelled = MedicalRecordService.AddPrescription(record, "Исходное назначение", author, Now);
+        var replacement = MedicalRecordService.ReplacePrescription(record, cancelled.Id, "Новое назначение", author, Now);
 
         var dto = record.ToDto();
 

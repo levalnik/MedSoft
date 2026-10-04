@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.Diagnoses.Factories;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Contracts.Diagnoses;
@@ -12,7 +13,7 @@ public sealed class CreateDiagnosisCommandHandler(
 {
     public async Task<DiagnosisDefinitionDto> Handle(CreateDiagnosisCommand request, CancellationToken cancellationToken)
     {
-        var diagnosis = DiagnosisDefinition.Create(request.Code, request.Name, timeProvider.GetUtcNow());
+        var diagnosis = DiagnosisDefinitionFactory.Create(request.Code, request.Name, timeProvider.GetUtcNow());
         if (await repository.ExistsConflictAsync(diagnosis.Code, diagnosis.Name, null, cancellationToken))
             throw new BusinessConflictException("Диагноз с таким кодом или названием уже существует.");
         repository.Add(diagnosis);

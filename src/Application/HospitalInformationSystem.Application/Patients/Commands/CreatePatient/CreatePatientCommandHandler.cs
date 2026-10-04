@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.Patients.Factories;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Contracts.Patients;
 using HospitalInformationSystem.Domain.Patients;
@@ -11,7 +12,7 @@ public sealed class CreatePatientCommandHandler(
 {
     public async Task<PatientDto> Handle(CreatePatientCommand request, CancellationToken cancellationToken)
     {
-        var patient = Patient.Create(request.FirstName, request.LastName, request.MiddleName,
+        var patient = PatientFactory.Create(request.FirstName, request.LastName, request.MiddleName,
             request.BirthDate, request.Sex.ToDomain(), request.Comment, timeProvider.GetUtcNow());
         repository.Add(patient);
         await unitOfWork.SaveChangesAsync(cancellationToken);

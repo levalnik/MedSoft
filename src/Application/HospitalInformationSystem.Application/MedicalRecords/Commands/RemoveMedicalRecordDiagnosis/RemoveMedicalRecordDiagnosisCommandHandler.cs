@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.MedicalRecords.Services;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Contracts.MedicalRecords;
@@ -12,7 +13,7 @@ public sealed class RemoveMedicalRecordDiagnosisCommandHandler(MedicalRecordComm
     {
         var author = await context.RequireAuthorAsync(request.MedicalWorkerId, cancellationToken);
         var record = await context.RequireRecordAsync(request.MedicalRecordId, cancellationToken);
-        record.RemoveDiagnosis(request.MedicalRecordDiagnosisId, author, context.Now);
+        MedicalRecordService.RemoveDiagnosis(record, request.MedicalRecordDiagnosisId, author, context.Now);
         await context.SaveChangesAsync(record, cancellationToken);
     }
 }

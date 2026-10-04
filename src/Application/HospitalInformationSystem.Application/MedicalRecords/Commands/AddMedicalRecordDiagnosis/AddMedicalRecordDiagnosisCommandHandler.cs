@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.MedicalRecords.Services;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Contracts.MedicalRecords;
@@ -14,7 +15,7 @@ public sealed class AddMedicalRecordDiagnosisCommandHandler(MedicalRecordCommand
         var record = await context.RequireRecordAsync(request.MedicalRecordId, cancellationToken);
         var definition = await diagnoses.FindAsync(request.DiagnosisId, tracking: false, cancellationToken)
             ?? throw new EntityNotFoundException("Диагноз справочника не найден.");
-        var result = record.AddDiagnosis(definition.Id, definition.Code, definition.Name, author, context.Now);
+        var result = MedicalRecordService.AddDiagnosis(record, definition.Id, definition.Code, definition.Name, author, context.Now);
         await context.SaveChangesAsync(record, cancellationToken);
         return result.ToDto();
     }

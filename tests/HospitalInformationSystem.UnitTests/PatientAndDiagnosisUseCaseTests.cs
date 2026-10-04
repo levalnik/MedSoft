@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.Patients.Factories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,7 +22,7 @@ namespace HospitalInformationSystem.UnitTests;
 public sealed class PatientAndDiagnosisUseCaseTests
 {
     private static Patient NewPatient() =>
-        Patient.Create("Елена", "Соколова", null, new DateOnly(1985, 3, 12),
+        PatientFactory.Create("Елена", "Соколова", null, new DateOnly(1985, 3, 12),
             AdministrativeSex.Female, null, DateTimeOffset.UnixEpoch);
 
     [Fact]

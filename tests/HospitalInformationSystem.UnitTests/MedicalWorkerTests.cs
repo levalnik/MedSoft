@@ -1,3 +1,5 @@
+using HospitalInformationSystem.Domain.MedicalWorkers.Factories;
+using HospitalInformationSystem.Domain.MedicalWorkers.Services;
 using System;
 using FluentAssertions;
 using HospitalInformationSystem.Domain.Common;
@@ -13,7 +15,7 @@ public sealed class MedicalWorkerTests
     [Fact]
     public void Create_trims_fields_and_stores_utc_timestamps()
     {
-        var worker = MedicalWorker.Create(" Алексей ", " Иванов ", " Врач-терапевт ", Now.ToOffset(TimeSpan.FromHours(3)));
+        var worker = MedicalWorkerFactory.Create(" Алексей ", " Иванов ", " Врач-терапевт ", Now.ToOffset(TimeSpan.FromHours(3)));
         worker.Id.Should().NotBeEmpty();
         worker.FirstName.Should().Be("Алексей");
         worker.LastName.Should().Be("Иванов");
@@ -33,9 +35,9 @@ public sealed class MedicalWorkerTests
     [InlineData("1234567890123456789012345")]
     public void Invalid_worker_fields_are_rejected(string? value)
     {
-        Action firstName = () => MedicalWorker.Create(value!, "Иванов", "Врач", Now);
-        Action lastName = () => MedicalWorker.Create("Алексей", value!, "Врач", Now);
-        Action position = () => MedicalWorker.Create("Алексей", "Иванов", value!, Now);
+        Action firstName = () => MedicalWorkerFactory.Create(value!, "Иванов", "Врач", Now);
+        Action lastName = () => MedicalWorkerFactory.Create("Алексей", value!, "Врач", Now);
+        Action position = () => MedicalWorkerFactory.Create("Алексей", "Иванов", value!, Now);
         firstName.Should().Throw<DomainValidationException>();
         lastName.Should().Throw<DomainValidationException>();
         position.Should().Throw<DomainValidationException>();
@@ -47,15 +49,15 @@ public sealed class MedicalWorkerTests
     public void Boundary_lengths_are_accepted(int length)
     {
         var text = new string('а', length);
-        var worker = MedicalWorker.Create(text, text, text, Now);
+        var worker = MedicalWorkerFactory.Create(text, text, text, Now);
         worker.FirstName.Length.Should().Be(length);
     }
 
     [Fact]
     public void Invalid_update_does_not_partially_change_entity()
     {
-        var worker = MedicalWorker.Create("Алексей", "Иванов", "Врач", Now);
-        Action update = () => worker.Update("Дмитрий", "Петров", "x", Now.AddDays(1));
+        var worker = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now);
+        Action update = () => MedicalWorkerService.Update(worker, "Дмитрий", "Петров", "x", Now.AddDays(1));
         update.Should().Throw<DomainValidationException>();
         worker.FirstName.Should().Be("Алексей");
         worker.LastName.Should().Be("Иванов");
@@ -65,12 +67,12 @@ public sealed class MedicalWorkerTests
     [Fact]
     public void Deletion_is_idempotent_and_update_does_not_restore_worker()
     {
-        var worker = MedicalWorker.Create("Алексей", "Иванов", "Врач", Now);
+        var worker = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now);
         var originalId = worker.Id;
-        worker.MarkAsDeleted(Now.AddHours(1));
-        worker.MarkAsDeleted(Now.AddHours(2));
+        MedicalWorkerService.MarkAsDeleted(worker, Now.AddHours(1));
+        MedicalWorkerService.MarkAsDeleted(worker, Now.AddHours(2));
         worker.UpdatedAtUtc.Should().Be(Now.AddHours(1));
-        worker.Update("Дмитрий", "Иванов", "Врач-хирург", Now.AddHours(3));
+        MedicalWorkerService.Update(worker, "Дмитрий", "Иванов", "Врач-хирург", Now.AddHours(3));
         worker.Id.Should().Be(originalId);
         worker.IsDeleted.Should().BeTrue();
         worker.CreatedAtUtc.Should().Be(Now);

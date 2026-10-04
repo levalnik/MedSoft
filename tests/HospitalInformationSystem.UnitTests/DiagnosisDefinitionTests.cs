@@ -1,3 +1,5 @@
+using HospitalInformationSystem.Domain.Diagnoses.Factories;
+using HospitalInformationSystem.Domain.Diagnoses.Services;
 using System;
 using FluentAssertions;
 using HospitalInformationSystem.Domain.Common;
@@ -19,16 +21,16 @@ public sealed class DiagnosisDefinitionTests
     [InlineData("A00.00", "1234567890123456789012345")]
     public void Invalid_code_or_name_is_rejected(string? code, string? name)
     {
-        var act = () => DiagnosisDefinition.Create(code!, name!, Now);
+        var act = () => DiagnosisDefinitionFactory.Create(code!, name!, Now);
         act.Should().Throw<DomainValidationException>();
     }
 
     [Fact]
     public void Update_normalizes_text_and_preserves_identity_and_creation_time()
     {
-        var diagnosis = DiagnosisDefinition.Create(" A00.00 ", " Холера ", Now);
+        var diagnosis = DiagnosisDefinitionFactory.Create(" A00.00 ", " Холера ", Now);
         var id = diagnosis.Id;
-        diagnosis.Update(" B01.00 ", " Ветряная оспа ", Now.AddHours(1));
+        DiagnosisDefinitionService.Update(diagnosis, " B01.00 ", " Ветряная оспа ", Now.AddHours(1));
 
         diagnosis.Code.Should().Be("B01.00");
         diagnosis.Name.Should().Be("Ветряная оспа");
@@ -40,8 +42,8 @@ public sealed class DiagnosisDefinitionTests
     [Fact]
     public void Failed_update_does_not_change_code_or_timestamp()
     {
-        var diagnosis = DiagnosisDefinition.Create("A00.00", "Холера", Now);
-        var act = () => diagnosis.Update("B01.00", " ", Now.AddHours(1));
+        var diagnosis = DiagnosisDefinitionFactory.Create("A00.00", "Холера", Now);
+        var act = () => DiagnosisDefinitionService.Update(diagnosis, "B01.00", " ", Now.AddHours(1));
 
         act.Should().Throw<DomainValidationException>();
         diagnosis.Code.Should().Be("A00.00");
