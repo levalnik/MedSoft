@@ -13,4 +13,5 @@ builder.Services.AddScoped(_ => new HttpClient
     Timeout = TimeSpan.FromSeconds(20)
 });
 builder.Services.AddScoped<MedicalWorkersApiClient>();
+builder.Services.AddScoped<DiagnosesApiClient>();
 await builder.Build().RunAsync();
