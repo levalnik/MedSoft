@@ -1,3 +1,7 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
@@ -5,6 +9,7 @@ using HospitalInformationSystem.Application.MedicalRecords.Snapshot;
 using HospitalInformationSystem.Domain.MedicalRecords;
 using HospitalInformationSystem.Domain.MedicalWorkers;
 using Moq;
+using Xunit;
 
 namespace HospitalInformationSystem.UnitTests;
 

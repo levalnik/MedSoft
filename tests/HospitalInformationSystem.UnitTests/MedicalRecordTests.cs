@@ -1,8 +1,11 @@
+using System;
+using System.Linq;
 using FluentAssertions;
 using HospitalInformationSystem.Application.MedicalRecords;
 using HospitalInformationSystem.Domain.Common;
 using HospitalInformationSystem.Domain.MedicalRecords;
 using HospitalInformationSystem.Domain.MedicalWorkers;
+using Xunit;
 
 namespace HospitalInformationSystem.UnitTests;
 

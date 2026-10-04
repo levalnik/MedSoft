@@ -1,5 +1,8 @@
+using System;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
+using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.Diagnoses;
 using HospitalInformationSystem.Contracts.Patients;
@@ -7,6 +10,7 @@ using HospitalInformationSystem.Infrastructure.Contexts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace HospitalInformationSystem.IntegrationTests;
 

@@ -1,3 +1,4 @@
+using System;
 using FluentAssertions;
 using HospitalInformationSystem.Domain.Common;
 using HospitalInformationSystem.Domain.Patients;
