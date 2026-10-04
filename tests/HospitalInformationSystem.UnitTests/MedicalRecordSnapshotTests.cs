@@ -1,3 +1,6 @@
+using HospitalInformationSystem.Domain.MedicalRecords.Factories;
+using HospitalInformationSystem.Domain.MedicalRecords.Services;
+using HospitalInformationSystem.Domain.MedicalWorkers.Factories;
 using System;
 using System.Linq;
 using System.Threading;
@@ -23,12 +26,12 @@ public sealed class MedicalRecordSnapshotTests
 
     private static (MedicalRecord Record, MedicalRecordDiagnosis Diagnosis, Prescription Original, Prescription Replacement) Scenario()
     {
-        var author = MedicalWorker.Create("Алексей", "Иванов", "Врач", T0);
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, T0);
-        var diagnosis = record.AddDiagnosis(Guid.NewGuid(), "I10.00", "Гипертензия", author, T1);
-        var original = record.AddPrescription("Исходное назначение", author, T2);
-        record.RemoveDiagnosis(diagnosis.Id, author, T3);
-        var replacement = record.ReplacePrescription(original.Id, "Новое назначение", author, T4);
+        var author = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", T0);
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, T0);
+        var diagnosis = MedicalRecordService.AddDiagnosis(record, Guid.NewGuid(), "I10.00", "Гипертензия", author, T1);
+        var original = MedicalRecordService.AddPrescription(record, "Исходное назначение", author, T2);
+        MedicalRecordService.RemoveDiagnosis(record, diagnosis.Id, author, T3);
+        var replacement = MedicalRecordService.ReplacePrescription(record, original.Id, "Новое назначение", author, T4);
         return (record, diagnosis, original, replacement);
     }
 
@@ -91,10 +94,10 @@ public sealed class MedicalRecordSnapshotTests
     [Fact]
     public void Equal_timestamps_are_replayed_by_version_not_input_order()
     {
-        var author = MedicalWorker.Create("Алексей", "Иванов", "Врач", T0);
-        var record = MedicalRecord.Create(Guid.NewGuid(), author, T0);
-        var original = record.AddPrescription("Исходное назначение", author, T0);
-        var replacement = record.ReplacePrescription(original.Id, "Новое назначение", author, T0);
+        var author = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", T0);
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, T0);
+        var original = MedicalRecordService.AddPrescription(record, "Исходное назначение", author, T0);
+        var replacement = MedicalRecordService.ReplacePrescription(record, original.Id, "Новое назначение", author, T0);
 
         var snapshot = MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.Reverse(), T0);
 
@@ -107,8 +110,11 @@ public sealed class MedicalRecordSnapshotTests
     {
         var (record, diagnosis, original, _) = Scenario();
         // Снимок не читает текущие дочерние записи: вся информация берётся из событий.
-        var withoutCurrentState = new MedicalRecord(record.Id, record.PatientId, record.CreatedAtUtc,
-            record.Version, [], [], record.HistoryEvents);
+        var withoutCurrentState = new MedicalRecord
+        {
+            Id = record.Id, PatientId = record.PatientId, CreatedAtUtc = record.CreatedAtUtc,
+            Version = record.Version, HistoryEvents = record.HistoryEvents
+        };
 
         var snapshot = MedicalRecordSnapshotReplay.Build(withoutCurrentState, withoutCurrentState.HistoryEvents, T2);
 
@@ -180,6 +186,11 @@ public sealed class MedicalRecordSnapshotTests
 
     private static MedicalRecordHistoryEvent ReplaceEvent(
         MedicalRecordHistoryEvent item, MedicalRecordEventType? type = null, string? payload = null, Guid? recordId = null) =>
-        new(item.Id, recordId ?? item.MedicalRecordId, item.Version, item.OccurredAtUtc, item.PerformedByMedicalWorkerId,
-            item.PerformedByNameSnapshot, item.PerformedByPositionSnapshot, type ?? item.EventType, item.EntityId, payload ?? item.PayloadJson);
+        new()
+        {
+            Id = item.Id, MedicalRecordId = recordId ?? item.MedicalRecordId, Version = item.Version,
+            OccurredAtUtc = item.OccurredAtUtc, PerformedByMedicalWorkerId = item.PerformedByMedicalWorkerId,
+            PerformedByNameSnapshot = item.PerformedByNameSnapshot, PerformedByPositionSnapshot = item.PerformedByPositionSnapshot,
+            EventType = type ?? item.EventType, EntityId = item.EntityId, PayloadJson = payload ?? item.PayloadJson
+        };
 }

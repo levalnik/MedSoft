@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.MedicalWorkers.Services;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using MediatR;
@@ -12,7 +13,7 @@ public sealed class DeleteMedicalWorkerCommandHandler(
     {
         var worker = await repository.FindAsync(request.Id, tracking: true, cancellationToken)
             ?? throw new EntityNotFoundException("Медработник не найден.");
-        worker.MarkAsDeleted(timeProvider.GetUtcNow());
+        MedicalWorkerService.MarkAsDeleted(worker, timeProvider.GetUtcNow());
         await repository.UpdateAsync(worker, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

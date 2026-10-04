@@ -1,58 +1,12 @@
-using HospitalInformationSystem.Domain.Common;
-
 namespace HospitalInformationSystem.Domain.MedicalWorkers;
 
 public sealed class MedicalWorker
 {
-    // Восстановление сохранённого состояния без нового Id или изменения времени.
-    public MedicalWorker(
-        Guid id, string firstName, string lastName, string position, bool isDeleted,
-        DateTimeOffset createdAtUtc, DateTimeOffset updatedAtUtc)
-    {
-        Id = id;
-        FirstName = Validate(firstName, "Имя");
-        LastName = Validate(lastName, "Фамилия");
-        Position = Validate(position, "Должность");
-        IsDeleted = isDeleted;
-        CreatedAtUtc = createdAtUtc.ToUniversalTime();
-        UpdatedAtUtc = updatedAtUtc.ToUniversalTime();
-    }
-
-    public Guid Id { get; private set; }
-    public string FirstName { get; private set; } = string.Empty;
-    public string LastName { get; private set; } = string.Empty;
-    public string Position { get; private set; } = string.Empty;
-    public bool IsDeleted { get; private set; }
-    public DateTimeOffset CreatedAtUtc { get; private set; }
-    public DateTimeOffset UpdatedAtUtc { get; private set; }
-
-    public static MedicalWorker Create(
-        string firstName, string lastName, string position, DateTimeOffset now) =>
-        new(Guid.NewGuid(), firstName, lastName, position, false, now, now);
-
-    public void Update(string firstName, string lastName, string position, DateTimeOffset now)
-    {
-        var validFirstName = Validate(firstName, "Имя");
-        var validLastName = Validate(lastName, "Фамилия");
-        var validPosition = Validate(position, "Должность");
-        FirstName = validFirstName;
-        LastName = validLastName;
-        Position = validPosition;
-        UpdatedAtUtc = now.ToUniversalTime();
-    }
-
-    public void MarkAsDeleted(DateTimeOffset now)
-    {
-        if (IsDeleted) return;
-        IsDeleted = true;
-        UpdatedAtUtc = now.ToUniversalTime();
-    }
-
-    private static string Validate(string? value, string label)
-    {
-        var normalized = value?.Trim();
-        if (normalized is null || normalized.Length is < 3 or > 24)
-            throw new DomainValidationException($"{label}: требуется от 3 до 24 символов.");
-        return normalized;
-    }
+    public Guid Id { get; init; }
+    public required string FirstName { get; set; }
+    public required string LastName { get; set; }
+    public required string Position { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; init; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
 }

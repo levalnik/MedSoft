@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.MedicalWorkers.Factories;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Domain.MedicalWorkers;
@@ -11,7 +12,7 @@ public sealed class CreateMedicalWorkerCommandHandler(
 {
     public async Task<MedicalWorkerDto> Handle(CreateMedicalWorkerCommand request, CancellationToken cancellationToken)
     {
-        var worker = MedicalWorker.Create(request.FirstName, request.LastName, request.Position, timeProvider.GetUtcNow());
+        var worker = MedicalWorkerFactory.Create(request.FirstName, request.LastName, request.Position, timeProvider.GetUtcNow());
         repository.Add(worker);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return worker.ToDto();

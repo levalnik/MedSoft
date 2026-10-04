@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.MedicalRecords.Factories;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Contracts.MedicalRecords;
@@ -17,7 +18,7 @@ public sealed class CreateMedicalRecordCommandHandler(
             ?? throw new EntityNotFoundException("Пациент не найден.");
         if (await presence.ExistsForPatientAsync(request.PatientId, cancellationToken))
             throw new BusinessConflictException("У пациента уже есть ЭМК.");
-        var record = MedicalRecord.Create(request.PatientId, author, context.Now);
+        var record = MedicalRecordFactory.Create(request.PatientId, author, context.Now);
         await context.SaveNewAsync(record, cancellationToken);
         return record.ToDto();
     }

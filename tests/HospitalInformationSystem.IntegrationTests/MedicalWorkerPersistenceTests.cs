@@ -1,3 +1,5 @@
+using HospitalInformationSystem.Domain.MedicalWorkers.Factories;
+using HospitalInformationSystem.Domain.MedicalWorkers.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,7 +23,7 @@ public sealed class MedicalWorkerPersistenceTests(HospitalApiFactory factory) : 
         var createdAt = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
         var updatedAt = createdAt.AddHours(1);
         var deletedAt = createdAt.AddHours(2);
-        var worker = MedicalWorker.Create("Алексей", "Орлов", "Врач", createdAt);
+        var worker = MedicalWorkerFactory.Create("Алексей", "Орлов", "Врач", createdAt);
 
         await using (var scope = factory.Services.CreateAsyncScope())
         {
@@ -38,7 +40,7 @@ public sealed class MedicalWorkerPersistenceTests(HospitalApiFactory factory) : 
             var repository = scope.ServiceProvider.GetRequiredService<IMedicalWorkerRepository>();
             var restored = (await repository.FindAsync(worker.Id, tracking: true, CancellationToken.None))!;
             restored.Should().BeEquivalentTo(worker);
-            restored.Update("Дмитрий", "Петров", "Врач-хирург", updatedAt);
+            MedicalWorkerService.Update(restored, "Дмитрий", "Петров", "Врач-хирург", updatedAt);
             await repository.UpdateAsync(restored, CancellationToken.None);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
@@ -52,7 +54,7 @@ public sealed class MedicalWorkerPersistenceTests(HospitalApiFactory factory) : 
             restored.Position.Should().Be("Врач-хирург");
             restored.CreatedAtUtc.Should().Be(createdAt);
             restored.UpdatedAtUtc.Should().Be(updatedAt);
-            restored.MarkAsDeleted(deletedAt);
+            MedicalWorkerService.MarkAsDeleted(restored, deletedAt);
             await repository.UpdateAsync(restored, CancellationToken.None);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
@@ -66,7 +68,7 @@ public sealed class MedicalWorkerPersistenceTests(HospitalApiFactory factory) : 
             restored.IsDeleted.Should().BeTrue();
             restored.CreatedAtUtc.Should().Be(createdAt);
             restored.UpdatedAtUtc.Should().Be(deletedAt);
-            restored.MarkAsDeleted(deletedAt.AddHours(1));
+            MedicalWorkerService.MarkAsDeleted(restored, deletedAt.AddHours(1));
             restored.UpdatedAtUtc.Should().Be(deletedAt);
             // UpdateAsync также умеет загрузить DBO, если чтение было без tracking.
             await repository.UpdateAsync(restored, CancellationToken.None);

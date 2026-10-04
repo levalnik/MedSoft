@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.MedicalRecords.Services;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Contracts.MedicalRecords;
@@ -12,7 +13,7 @@ public sealed class AddPrescriptionCommandHandler(MedicalRecordCommandContext co
     {
         var author = await context.RequireAuthorAsync(request.MedicalWorkerId, cancellationToken);
         var record = await context.RequireRecordAsync(request.MedicalRecordId, cancellationToken);
-        var result = record.AddPrescription(request.Text, author, context.Now);
+        var result = MedicalRecordService.AddPrescription(record, request.Text, author, context.Now);
         await context.SaveChangesAsync(record, cancellationToken);
         return result.ToDto();
     }

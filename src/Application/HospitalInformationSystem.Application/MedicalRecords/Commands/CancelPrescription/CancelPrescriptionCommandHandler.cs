@@ -1,3 +1,4 @@
+using HospitalInformationSystem.Domain.MedicalRecords.Services;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Contracts.MedicalRecords;
@@ -12,7 +13,7 @@ public sealed class CancelPrescriptionCommandHandler(MedicalRecordCommandContext
     {
         var author = await context.RequireAuthorAsync(request.MedicalWorkerId, cancellationToken);
         var record = await context.RequireRecordAsync(request.MedicalRecordId, cancellationToken);
-        record.CancelPrescription(request.PrescriptionId, author, context.Now);
+        MedicalRecordService.CancelPrescription(record, request.PrescriptionId, author, context.Now);
         await context.SaveChangesAsync(record, cancellationToken);
     }
 }
