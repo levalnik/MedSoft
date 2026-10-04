@@ -15,6 +15,11 @@ public static class DependencyInjection
         services.AddDbContext<HospitalDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<HospitalDbContext>());
         services.AddScoped<IMedicalWorkerRepository, MedicalWorkerRepository>();
+        services.AddScoped<IPatientRepository, PatientRepository>();
+        services.AddScoped<IDiagnosisRepository, DiagnosisRepository>();
+        services.AddScoped<MedicalRecordRepository>();
+        services.AddScoped<IMedicalRecordRepository>(provider => provider.GetRequiredService<MedicalRecordRepository>());
+        services.AddScoped<IMedicalRecordPresence>(provider => provider.GetRequiredService<MedicalRecordRepository>());
         services.AddScoped<DatabaseInitializer>();
         return services;
     }

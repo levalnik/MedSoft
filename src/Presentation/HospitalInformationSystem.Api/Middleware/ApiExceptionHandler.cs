@@ -21,6 +21,11 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
             },
             DomainValidationException => new ProblemDetails { Status = 400, Title = "Некорректные данные.", Detail = exception.Message },
             EntityNotFoundException => new ProblemDetails { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
+            DomainEntityNotFoundException => new ProblemDetails { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
+            BusinessConflictException or BusinessRuleConflictException => new ProblemDetails
+            {
+                Status = 409, Title = "Операция конфликтует с текущим состоянием данных.", Detail = exception.Message
+            },
             _ => new ProblemDetails { Status = 500, Title = "Не удалось выполнить запрос." }
         };
         if (problem.Status == 500) logger.LogError(exception, "Unexpected error processing {Path}", context.Request.Path);

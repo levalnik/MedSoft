@@ -1,0 +1,77 @@
+@baseUrl = http://localhost:5200
+@workerId = 00000000-0000-0000-0000-000000000000
+@patientId = 00000000-0000-0000-0000-000000000000
+@diagnosisId = 00000000-0000-0000-0000-000000000000
+@recordId = 00000000-0000-0000-0000-000000000000
+@recordDiagnosisId = 00000000-0000-0000-0000-000000000000
+@prescriptionId = 00000000-0000-0000-0000-000000000000
+
+### Выполняйте по очереди, копируя id ответов в переменные выше.
+### Выбрать активного автора (или создать через API медработников).
+GET {{baseUrl}}/api/medical-workers
+
+### Создать пациента → patientId
+POST {{baseUrl}}/api/patients
+Content-Type: application/json
+
+{
+  "firstName": "Елена",
+  "lastName": "Соколова",
+  "middleName": "Петровна",
+  "birthDate": "1985-03-12",
+  "sex": "Female",
+  "comment": null
+}
+
+### Создать элемент справочника → diagnosisId; повтор такого кода/названия вернёт 409.
+POST {{baseUrl}}/api/diagnoses
+Content-Type: application/json
+
+{ "code": "I10.00", "name": "Гипертензия" }
+
+### Создать ЭМК → recordId
+POST {{baseUrl}}/api/patients/{{patientId}}/medical-record
+X-Medical-Worker-Id: {{workerId}}
+
+### Получить текущее состояние без заголовка автора
+GET {{baseUrl}}/api/patients/{{patientId}}/medical-record
+
+### Добавить диагноз в ЭМК → recordDiagnosisId (отличается от diagnosisId)
+POST {{baseUrl}}/api/medical-records/{{recordId}}/diagnoses
+X-Medical-Worker-Id: {{workerId}}
+Content-Type: application/json
+
+{ "diagnosisId": "{{diagnosisId}}" }
+
+### Добавить назначение → prescriptionId
+POST {{baseUrl}}/api/medical-records/{{recordId}}/prescriptions
+X-Medical-Worker-Id: {{workerId}}
+Content-Type: application/json
+
+{ "text": "Контроль давления утром" }
+
+### Заменить назначение: в ответе новый id, старое остаётся в истории
+PUT {{baseUrl}}/api/medical-records/{{recordId}}/prescriptions/{{prescriptionId}}
+X-Medical-Worker-Id: {{workerId}}
+Content-Type: application/json
+
+{ "text": "Контроль давления утром и вечером" }
+
+### Удалить диагноз карты
+DELETE {{baseUrl}}/api/medical-records/{{recordId}}/diagnoses/{{recordDiagnosisId}}
+X-Medical-Worker-Id: {{workerId}}
+
+### История: версии по порядку, payloadJson — JSON-строка
+GET {{baseUrl}}/api/medical-records/{{recordId}}/history
+
+### Подставьте occurredAtUtc нужного события; до создания карты будет 404
+GET {{baseUrl}}/api/medical-records/{{recordId}}/snapshot?at=2026-10-04T12:00:00Z
+
+### Проверка защиты: пациент с картой не удаляется, ожидается 409
+DELETE {{baseUrl}}/api/patients/{{patientId}}
+
+### Проверка автора: ожидается 400 и отсутствие новых событий
+POST {{baseUrl}}/api/medical-records/{{recordId}}/prescriptions
+Content-Type: application/json
+
+{ "text": "Не должно сохраниться" }
