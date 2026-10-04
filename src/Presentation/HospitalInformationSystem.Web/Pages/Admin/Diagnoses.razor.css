@@ -1,0 +1,16 @@
+.diagnosis-import { margin-bottom: 24px; }
+.import-content { padding: 22px 28px; }
+.import-content p { color: #637261; font-size: 13px; line-height: 1.7; max-width: 850px; }
+.import-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 18px; margin: 22px 0; }
+.import-controls > div { flex: 1 1 280px; max-width: 480px; min-width: 0; }
+.import-controls label { display: block; margin-bottom: 8px; font-size: 13px; }
+.import-controls a { align-self: center; font-size: 13px; }
+.import-result { padding: 16px; border-radius: 8px; background: #edf5e9; color: #245b46; }
+.diagnosis-table td, .diagnosis-table th { padding: 16px 28px; }
+.diagnosis-table code { color: #245b46; white-space: nowrap; }
+@media (max-width: 600px) {
+    .import-content { padding: 18px; }
+    .import-controls { align-items: stretch; flex-direction: column; }
+    .import-controls > div { flex-basis: auto; max-width: none; }
+    .diagnosis-table td, .diagnosis-table th { padding: 14px 18px; }
+}
