@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Domain.MedicalWorkers;
+using HospitalInformationSystem.Infrastructure.Contexts;
 using HospitalInformationSystem.Infrastructure.Persistence;
 using HospitalInformationSystem.Infrastructure.Persistence.Models;
 using Microsoft.EntityFrameworkCore;

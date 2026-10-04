@@ -1,6 +1,7 @@
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Domain.MedicalWorkers;
+using HospitalInformationSystem.Infrastructure.Contexts;
 using HospitalInformationSystem.Infrastructure.Persistence.Mappings;
 using Microsoft.EntityFrameworkCore;
 

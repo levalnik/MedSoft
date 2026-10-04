@@ -5,6 +5,8 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
+using HospitalInformationSystem.Infrastructure.Contexts;
+using HospitalInformationSystem.Infrastructure.Initializers;
 using HospitalInformationSystem.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

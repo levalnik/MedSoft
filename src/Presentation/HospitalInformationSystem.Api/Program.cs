@@ -2,6 +2,8 @@ using HospitalInformationSystem.Api.Middleware;
 using HospitalInformationSystem.Application;
 using HospitalInformationSystem.Application.DI;
 using HospitalInformationSystem.Infrastructure;
+using HospitalInformationSystem.Infrastructure.Contexts;
+using HospitalInformationSystem.Infrastructure.Initializers;
 using HospitalInformationSystem.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
