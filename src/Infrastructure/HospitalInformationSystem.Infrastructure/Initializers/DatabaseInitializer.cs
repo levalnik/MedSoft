@@ -1,8 +1,9 @@
 using HospitalInformationSystem.Domain.MedicalWorkers;
+using HospitalInformationSystem.Infrastructure.Contexts;
 using HospitalInformationSystem.Infrastructure.Persistence.Mappings;
 using Microsoft.EntityFrameworkCore;
 
-namespace HospitalInformationSystem.Infrastructure.Persistence;
+namespace HospitalInformationSystem.Infrastructure.Initializers;
 
 public sealed class DatabaseInitializer(HospitalDbContext db, TimeProvider timeProvider)
 {

@@ -2,7 +2,7 @@ using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Infrastructure.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace HospitalInformationSystem.Infrastructure.Persistence;
+namespace HospitalInformationSystem.Infrastructure.Contexts;
 
 public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> options) : DbContext(options), IUnitOfWork
 {
