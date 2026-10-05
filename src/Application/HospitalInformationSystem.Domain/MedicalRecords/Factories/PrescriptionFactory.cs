@@ -13,9 +13,10 @@ public static class PrescriptionFactory
             ReplacesPrescriptionId = replacesPrescriptionId
         };
 
-    internal static string NormalizeText(string? text)
+    private static string NormalizeText(string? text)
     {
         var value = text?.Trim();
+        TextValidation.RejectNullCharacter(value, "Назначение");
         if (value is null || value.Length is < 3 or > 128)
             throw new DomainValidationException("Назначение: требуется от 3 до 128 символов.");
         return value;

@@ -16,4 +16,3 @@ internal static partial class PatientDboMapper
     [MapperIgnoreTarget(nameof(PatientDbo.CreatedAtUtc))]
     public static partial void UpdateDbo(this Patient entity, PatientDbo dbo);
 }
-

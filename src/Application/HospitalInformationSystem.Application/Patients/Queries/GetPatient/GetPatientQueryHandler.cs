@@ -11,11 +11,10 @@ public sealed class GetPatientQueryHandler(IPatientRepository repository, IMedic
     public async Task<PatientDto> Handle(GetPatientQuery request, CancellationToken cancellationToken)
     {
         var patient = await repository.FindAsync(request.Id, tracking: false, cancellationToken)
-            ?? throw new EntityNotFoundException("Пациент не найден.");
-        return patient.ToDto() with
+                      ?? throw new EntityNotFoundException("Пациент не найден.");
+        return Mapping.PatientMapping.ToDto(patient) with
         {
             HasMedicalRecord = await recordPresence.ExistsForPatientAsync(patient.Id, cancellationToken)
         };
     }
 }
-

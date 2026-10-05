@@ -8,10 +8,12 @@ namespace HospitalInformationSystem.Application.MedicalRecords.Queries.GetMedica
 public sealed class GetMedicalRecordHistoryQueryHandler(IMedicalRecordRepository repository)
     : IRequestHandler<GetMedicalRecordHistoryQuery, IReadOnlyList<MedicalRecordHistoryEventDto>>
 {
-    public async Task<IReadOnlyList<MedicalRecordHistoryEventDto>> Handle(GetMedicalRecordHistoryQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<MedicalRecordHistoryEventDto>> Handle(GetMedicalRecordHistoryQuery request,
+        CancellationToken cancellationToken)
     {
         var record = await repository.FindAsync(request.Id, tracking: false, cancellationToken)
-            ?? throw new EntityNotFoundException("ЭМК не найдена.");
-        return record.HistoryEvents.OrderBy(x => x.Version).Select(x => x.ToDto()).ToArray();
+                     ?? throw new EntityNotFoundException("ЭМК не найдена.");
+        return record.HistoryEvents.OrderBy(x => x.Version).Select(x => Mapping.MedicalRecordMapping.ToDto(x))
+            .ToArray();
     }
 }

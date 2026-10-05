@@ -13,10 +13,13 @@ using MediatR;
 namespace HospitalInformationSystem.Application.Diagnoses.Commands.ImportDiagnoses;
 
 public sealed class ImportDiagnosesCommandHandler(
-    IDiagnosisRepository repository, IUnitOfWork unitOfWork, TimeProvider timeProvider)
-    : IRequestHandler<ImportDiagnosesCommand, DiagnosisImportResultDto>
+    IDiagnosisRepository repository,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider
+) : IRequestHandler<ImportDiagnosesCommand, DiagnosisImportResultDto>
 {
-    public async Task<DiagnosisImportResultDto> Handle(ImportDiagnosesCommand request, CancellationToken cancellationToken)
+    public async Task<DiagnosisImportResultDto> Handle(ImportDiagnosesCommand request,
+        CancellationToken cancellationToken)
     {
         var rows = DiagnosisCsvParser.Parse(request.Csv, cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -31,19 +34,21 @@ public sealed class ImportDiagnosesCommandHandler(
                 errors.Add(new($"file[{row.Line}].Code", $"Строка {row.Line}: повтор кода {row.Code}."));
             if (!names.Add(row.Name))
                 errors.Add(new($"file[{row.Line}].Name", $"Строка {row.Line}: повтор названия {row.Name}."));
-            try { candidates.Add((row, DiagnosisDefinitionFactory.Create(row.Code, row.Name, now))); }
+            try
+            {
+                candidates.Add((row, DiagnosisDefinitionFactory.Create(row.Code, row.Name, now)));
+            }
             catch (DomainValidationException e)
             {
                 errors.Add(new($"file[{row.Line}]", $"Строка {row.Line}: {e.Message}"));
             }
         }
+
         if (errors.Count > 0) throw new ValidationException(errors);
 
-        var existing = await repository.ListAsync(cancellationToken);
+        var existing = await repository.FindImportMatchesAsync(codes, names, cancellationToken);
         var byCode = existing.ToDictionary(x => x.Code, StringComparer.Ordinal);
         var byName = existing.ToDictionary(x => x.Name, StringComparer.Ordinal);
-        // A name already belonging to another code is a conflict, even if that
-        // other code is also in this file. No writes occur until all rows pass.
         foreach (var (row, diagnosis) in candidates)
             if (byName.TryGetValue(diagnosis.Name, out var owner) && owner.Code != diagnosis.Code)
                 throw new BusinessConflictException(
@@ -68,8 +73,7 @@ public sealed class ImportDiagnosesCommandHandler(
                 updated++;
             }
         }
-        // EF Core wraps this single SaveChanges in a transaction, including
-        // all batches. Database constraint failures roll back the entire file.
+
         if (created + updated > 0)
             await unitOfWork.SaveChangesAsync(cancellationToken);
         return new DiagnosisImportResultDto(created, updated, unchanged);

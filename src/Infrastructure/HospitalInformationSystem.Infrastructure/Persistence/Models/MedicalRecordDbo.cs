@@ -10,4 +10,3 @@ public sealed class MedicalRecordDbo
     public List<PrescriptionDbo> Prescriptions { get; set; } = [];
     public List<MedicalRecordHistoryEventDbo> HistoryEvents { get; set; } = [];
 }
-

@@ -8,6 +8,6 @@ public sealed class GetDiagnosesQueryHandler(IDiagnosisRepository repository)
     : IRequestHandler<GetDiagnosesQuery, IReadOnlyList<DiagnosisDefinitionDto>>
 {
     public async Task<IReadOnlyList<DiagnosisDefinitionDto>> Handle(GetDiagnosesQuery request, CancellationToken cancellationToken) =>
-        (await repository.ListAsync(cancellationToken)).Select(x => x.ToDto()).ToArray();
+        (await repository.ListAsync(cancellationToken)).Select(Mapping.DiagnosisMapping.ToDto).ToArray();
 }
 

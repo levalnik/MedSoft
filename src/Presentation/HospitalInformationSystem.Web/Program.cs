@@ -9,7 +9,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(_ => new HttpClient
 {
     BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"]
-        ?? throw new InvalidOperationException("ApiBaseUrl is required.")),
+                          ?? throw new InvalidOperationException("ApiBaseUrl is required.")),
     Timeout = TimeSpan.FromSeconds(20)
 });
 builder.Services.AddScoped<MedicalWorkersApiClient>();

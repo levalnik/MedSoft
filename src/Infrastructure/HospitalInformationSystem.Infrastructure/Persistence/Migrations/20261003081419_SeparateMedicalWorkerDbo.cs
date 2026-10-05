@@ -10,13 +10,11 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Меняется CLR-тип в snapshot EF; таблица и её данные остаются прежними.
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // Обратный переход также не требует изменения схемы PostgreSQL.
         }
     }
 }

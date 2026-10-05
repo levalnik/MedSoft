@@ -17,4 +17,3 @@ public sealed class UpdatePatientCommandValidator : AbstractValidator<UpdatePati
         RuleFor(x => x.Sex).IsInEnum().WithMessage("Неизвестное значение пола.");
     }
 }
-

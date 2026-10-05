@@ -26,7 +26,8 @@ public sealed class MedicalWorkerUseCaseTests
         repository.Setup(x => x.Add(It.IsAny<MedicalWorker>())).Callback<MedicalWorker>(worker => saved = worker);
         var handler = new CreateMedicalWorkerCommandHandler(repository.Object, unitOfWork.Object, clock.Object);
 
-        var result = await handler.Handle(new CreateMedicalWorkerCommand("Алексей", "Иванов", "Врач"), CancellationToken.None);
+        var result = await handler.Handle(new CreateMedicalWorkerCommand("Алексей", "Иванов", "Врач"),
+            CancellationToken.None);
 
         saved.Should().NotBeNull();
         saved!.CreatedAtUtc.Should().Be(now);

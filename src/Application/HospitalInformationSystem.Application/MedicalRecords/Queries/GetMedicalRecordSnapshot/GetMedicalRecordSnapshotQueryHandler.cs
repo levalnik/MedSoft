@@ -8,7 +8,8 @@ namespace HospitalInformationSystem.Application.MedicalRecords.Queries.GetMedica
 public sealed class GetMedicalRecordSnapshotQueryHandler(IMedicalRecordSnapshotBuilder builder)
     : IRequestHandler<GetMedicalRecordSnapshotQuery, MedicalRecordSnapshotDto>
 {
-    public async Task<MedicalRecordSnapshotDto> Handle(GetMedicalRecordSnapshotQuery request, CancellationToken cancellationToken)
+    public async Task<MedicalRecordSnapshotDto> Handle(GetMedicalRecordSnapshotQuery request,
+        CancellationToken cancellationToken)
     {
         return await builder.BuildAsync(request.Id, request.At, cancellationToken);
     }

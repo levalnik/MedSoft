@@ -16,7 +16,8 @@ namespace HospitalInformationSystem.Api.Controllers;
 public sealed class DiagnosesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<DiagnosisDefinitionDto>>> GetListAsync(CancellationToken cancellationToken) =>
+    public async Task<ActionResult<IReadOnlyList<DiagnosisDefinitionDto>>> GetListAsync(
+        CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetDiagnosesQuery(), cancellationToken));
 
     [HttpGet("{id:guid}")]
@@ -25,14 +26,16 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<DiagnosisDefinitionDto>(StatusCodes.Status201Created)]
-    public async Task<ActionResult<DiagnosisDefinitionDto>> CreateAsync(SaveDiagnosisRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<DiagnosisDefinitionDto>> CreateAsync(SaveDiagnosisRequest request,
+        CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CreateDiagnosisCommand(request.Code, request.Name), cancellationToken);
         return CreatedAtAction("Get", new { id = result.Id }, result);
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<DiagnosisDefinitionDto>> UpdateAsync(Guid id, SaveDiagnosisRequest request, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<DiagnosisDefinitionDto>> UpdateAsync(Guid id, SaveDiagnosisRequest request,
+        CancellationToken cancellationToken) =>
         Ok(await sender.Send(new UpdateDiagnosisCommand(id, request.Code, request.Name), cancellationToken));
 
     [HttpPost("import")]
@@ -42,19 +45,26 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
     public async Task<ActionResult<DiagnosisImportResultDto>> ImportAsync(
         [FromForm] IFormFile? file, CancellationToken cancellationToken)
     {
-        if (file is null || file.Length == 0)
+        if (Request.Form.Files.Count != 1 || file is null)
+            return Problem(statusCode: 400, detail: "Передайте ровно один CSV-файл в поле file.");
+        if (file.Length == 0)
             return Problem(statusCode: 400, detail: "Выберите непустой CSV-файл в поле file.");
         if (file.Length > DiagnosisImportLimits.MaxFileBytes)
             return Problem(statusCode: 413, detail: "Размер CSV-файла не должен превышать 1 МиБ.");
 
         await using var stream = file.OpenReadStream();
-        using var reader = new StreamReader(stream, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: false);
+        using var reader =
+            new StreamReader(stream, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: false);
         string csv;
-        try { csv = await reader.ReadToEndAsync(cancellationToken); }
+        try
+        {
+            csv = await reader.ReadToEndAsync(cancellationToken);
+        }
         catch (DecoderFallbackException)
         {
             return Problem(statusCode: 400, detail: "Сохраните CSV-файл в кодировке UTF-8.");
         }
+
         return Ok(await sender.Send(new ImportDiagnosesCommand(csv), cancellationToken));
     }
 

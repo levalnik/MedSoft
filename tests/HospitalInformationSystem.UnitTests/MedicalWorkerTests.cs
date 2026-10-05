@@ -15,7 +15,8 @@ public sealed class MedicalWorkerTests
     [Fact]
     public void Create_trims_fields_and_stores_utc_timestamps()
     {
-        var worker = MedicalWorkerFactory.Create(" Алексей ", " Иванов ", " Врач-терапевт ", Now.ToOffset(TimeSpan.FromHours(3)));
+        var worker = MedicalWorkerFactory.Create(" Алексей ", " Иванов ", " Врач-терапевт ",
+            Now.ToOffset(TimeSpan.FromHours(3)));
         worker.Id.Should().NotBeEmpty();
         worker.FirstName.Should().Be("Алексей");
         worker.LastName.Should().Be("Иванов");

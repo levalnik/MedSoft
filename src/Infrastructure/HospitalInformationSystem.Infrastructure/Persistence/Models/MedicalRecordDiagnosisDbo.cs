@@ -12,4 +12,3 @@ public sealed class MedicalRecordDiagnosisDbo
     public DateTimeOffset? RemovedAtUtc { get; set; }
     public Guid? RemovedByMedicalWorkerId { get; set; }
 }
-

@@ -12,4 +12,3 @@ public sealed class PatientDbo
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
-

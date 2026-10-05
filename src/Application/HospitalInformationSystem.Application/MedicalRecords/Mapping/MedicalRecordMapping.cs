@@ -2,7 +2,7 @@ using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Domain.MedicalRecords;
 using Riok.Mapperly.Abstractions;
 
-namespace HospitalInformationSystem.Application.MedicalRecords;
+namespace HospitalInformationSystem.Application.MedicalRecords.Mapping;
 
 [Mapper]
 public static partial class MedicalRecordMapping
@@ -29,7 +29,6 @@ public static partial class MedicalRecordMapping
     [MapperIgnoreSource(nameof(MedicalRecordHistoryEvent.MedicalRecordId))]
     public static partial MedicalRecordHistoryEventDto ToDto(this MedicalRecordHistoryEvent historyEvent);
 
-    // Пользовательские преобразования коллекций сохраняют фильтрацию current-state API.
     private static IReadOnlyCollection<MedicalRecordDiagnosisDto> MapCurrentDiagnoses(
         IReadOnlyCollection<MedicalRecordDiagnosis> diagnoses) =>
         diagnoses.Where(x => x.RemovedAtUtc is null).Select(x => x.ToDto()).ToArray();

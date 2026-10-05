@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -7,6 +8,7 @@ using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Diagnoses.Commands.ImportDiagnoses;
 using HospitalInformationSystem.Application.Diagnoses.Import;
 using HospitalInformationSystem.Contracts.Diagnoses;
+using HospitalInformationSystem.Domain.Diagnoses.Factories;
 using Moq;
 using Xunit;
 
@@ -17,7 +19,8 @@ public sealed class DiagnosisCsvImportTests
     [Fact]
     public void Parser_handles_bom_crlf_commas_escaped_quotes_and_multiline_fields()
     {
-        var rows = DiagnosisCsvParser.Parse("\uFEFFCode,Name\r\n A00.00 , \"Боль, \"\"острая\"\"\"\r\nB00.00,\"Первая\r\nвторая\"\r\n");
+        var rows = DiagnosisCsvParser.Parse(
+            "\uFEFFCode,Name\r\n A00.00 , \"Боль, \"\"острая\"\"\"\r\nB00.00,\"Первая\r\nвторая\"\r\n");
         rows.Should().HaveCount(2);
         rows[0].Should().Be(new DiagnosisCsvRow(2, "A00.00", "Боль, \"острая\""));
         rows[1].Name.Should().Be("Первая\r\nвторая");
@@ -68,7 +71,29 @@ public sealed class DiagnosisCsvImportTests
         var action = () => handler.Handle(new ImportDiagnosesCommand("Code,Name\n" + data), default);
 
         var error = await action.Should().ThrowAsync<ValidationException>();
-        error.Which.Errors.Should().Contain(x => x.ErrorMessage.Contains(expected) && x.ErrorMessage.Contains("Строка 3"));
+        error.Which.Errors.Should()
+            .Contain(x => x.ErrorMessage.Contains(expected) && x.ErrorMessage.Contains("Строка 3"));
+        repository.VerifyNoOtherCalls();
+        unitOfWork.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Identical_import_does_not_update_or_save_any_rows()
+    {
+        var diagnosis = DiagnosisDefinitionFactory.Create("A00.00", "Первый диагноз", DateTimeOffset.UtcNow);
+        var repository = new Mock<IDiagnosisRepository>(MockBehavior.Strict);
+        repository.Setup(x => x.FindImportMatchesAsync(
+                It.Is<IReadOnlyCollection<string>>(codes => codes.SequenceEqual(new[] { diagnosis.Code })),
+                It.Is<IReadOnlyCollection<string>>(names => names.SequenceEqual(new[] { diagnosis.Name })), default))
+            .ReturnsAsync(new[] { diagnosis });
+        var unitOfWork = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        var handler = new ImportDiagnosesCommandHandler(repository.Object, unitOfWork.Object, TimeProvider.System);
+
+        var result = await handler.Handle(new ImportDiagnosesCommand($"Code,Name\n{diagnosis.Code},{diagnosis.Name}"),
+            default);
+
+        result.Should().Be(new DiagnosisImportResultDto(0, 0, 1));
+        repository.VerifyAll();
         repository.VerifyNoOtherCalls();
         unitOfWork.VerifyNoOtherCalls();
     }

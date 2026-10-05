@@ -6,37 +6,52 @@
   <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="app-header">
     <div class="header-inner">
-      <a class="brand" href="/admin/medical-workers"><span class="brand-mark"><Icon Name="pulse" /></span><span>Учебная HIS<small>Госпитальная система</small></span></a>
+      <a class="brand" href="/admin/medical-workers"><span class="brand-mark"><Icon Name="pulse"/></span><span>Учебная HIS<small>Госпитальная система</small></span></a>
       <div class="header-context"><span class="context-dot"></span>Рабочее пространство</div>
       <div class="mode-picker">
         <span class="mode-label">Режим работы</span>
         <div class="mode-switch" aria-label="Режим интерфейса">
-          <a class="@(!IsMedical ? "selected" : "")" aria-current="@(!IsMedical ? "true" : null)" href="/admin/medical-workers">Администратор</a>
-          <a class="@(IsMedical ? "selected" : "")" aria-current="@(IsMedical ? "true" : null)" href="/medical/patients">Медработник</a>
+          <a class="@(!IsMedical ? "selected" : "")" aria-current="@(!IsMedical ? "true" : null)"
+             href="/admin/medical-workers">Администратор</a>
+          <a class="@(IsMedical ? "selected" : "")" aria-current="@(IsMedical ? "true" : null)"
+             href="/medical/patients">Медработник</a>
         </div>
       </div>
     </div>
     <nav class="main-nav" aria-label="Основная навигация">
       @if (IsMedical)
       {
-        <NavLink href="/medical/patients"><Icon Name="patients" /> Пациенты</NavLink>
-        <NavLink href="/medical/my-patients"><Icon Name="record" /> Мои пациенты</NavLink>
+        <NavLink href="/medical/patients">
+          <Icon Name="patients"/>
+          Пациенты
+        </NavLink>
+        <NavLink href="/medical/my-patients">
+          <Icon Name="record"/>
+          Мои пациенты
+        </NavLink>
       }
       else
       {
-        <NavLink href="/admin/medical-workers"><Icon Name="workers" /> Медработники</NavLink>
-        <NavLink href="/admin/diagnoses"><Icon Name="catalog" /> Диагнозы</NavLink>
+        <NavLink href="/admin/medical-workers">
+          <Icon Name="workers"/>
+          Медработники
+        </NavLink>
+        <NavLink href="/admin/diagnoses">
+          <Icon Name="catalog"/>
+          Диагнозы
+        </NavLink>
       }
       <span class="nav-note">@(IsMedical ? "Работа с пациентами" : "Управление учреждением")</span>
     </nav>
   </header>
   <main id="main-content" tabindex="-1">@Body</main>
-  <footer class="page-footer"><span>Учебная HIS <span class="footer-divider">/</span> Информация под рукой</span><span>Учебный проект · 2026</span></footer>
+  <footer class="page-footer"><span>Учебная HIS <span class="footer-divider">/</span> Информация под рукой</span><span>Учебный проект · 2026</span>
+  </footer>
 </div>
 
 @code {
-    private bool IsMedical => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("medical/", StringComparison.Ordinal);
-    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => InvokeAsync(StateHasChanged);
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+  private bool IsMedical => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("medical/", StringComparison.Ordinal);
+  protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+  private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => InvokeAsync(StateHasChanged);
+  public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }

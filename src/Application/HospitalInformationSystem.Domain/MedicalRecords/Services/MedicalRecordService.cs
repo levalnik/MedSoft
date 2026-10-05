@@ -7,14 +7,17 @@ namespace HospitalInformationSystem.Domain.MedicalRecords.Services;
 public static class MedicalRecordService
 {
     public static MedicalRecordDiagnosis AddDiagnosis(
-        MedicalRecord record, Guid diagnosisDefinitionId, string code, string name, MedicalWorker author, DateTimeOffset now)
+        MedicalRecord record, Guid diagnosisDefinitionId, string code, string name, MedicalWorker author,
+        DateTimeOffset now)
     {
         ValidateAuthor(author);
         var at = EventTime(record, now);
-        var diagnosis = MedicalRecordDiagnosisFactory.Create(record.Id, diagnosisDefinitionId, code, name, author.Id, at);
+        var diagnosis =
+            MedicalRecordDiagnosisFactory.Create(record.Id, diagnosisDefinitionId, code, name, author.Id, at);
         record.Diagnoses = record.Diagnoses.Append(diagnosis).ToList().AsReadOnly();
         AppendEvent(record, MedicalRecordEventType.DiagnosisAdded, diagnosis.Id,
-            new DiagnosisAddedPayload(diagnosis.Id, diagnosisDefinitionId, diagnosis.DiagnosisCodeSnapshot, diagnosis.DiagnosisNameSnapshot), author, at);
+            new DiagnosisAddedPayload(diagnosis.Id, diagnosisDefinitionId, diagnosis.DiagnosisCodeSnapshot,
+                diagnosis.DiagnosisNameSnapshot), author, at);
         return diagnosis;
     }
 
@@ -22,17 +25,19 @@ public static class MedicalRecordService
     {
         ValidateAuthor(author);
         var diagnosis = record.Diagnoses.SingleOrDefault(x => x.Id == itemId)
-            ?? throw new DomainEntityNotFoundException("Диагноз в этой медицинской карте не найден.");
+                        ?? throw new DomainEntityNotFoundException("Диагноз в этой медицинской карте не найден.");
         if (diagnosis.RemovedAtUtc is not null)
             throw new BusinessRuleConflictException("Диагноз уже удалён из медицинской карты.");
         var at = EventTime(record, now);
         diagnosis.RemovedAtUtc = at;
         diagnosis.RemovedByMedicalWorkerId = author.Id;
         AppendEvent(record, MedicalRecordEventType.DiagnosisRemoved, diagnosis.Id,
-            new DiagnosisRemovedPayload(diagnosis.Id, diagnosis.DiagnosisCodeSnapshot, diagnosis.DiagnosisNameSnapshot), author, at);
+            new DiagnosisRemovedPayload(diagnosis.Id, diagnosis.DiagnosisCodeSnapshot, diagnosis.DiagnosisNameSnapshot),
+            author, at);
     }
 
-    public static Prescription AddPrescription(MedicalRecord record, string text, MedicalWorker author, DateTimeOffset now)
+    public static Prescription AddPrescription(MedicalRecord record, string text, MedicalWorker author,
+        DateTimeOffset now)
     {
         ValidateAuthor(author);
         var at = EventTime(record, now);
@@ -47,11 +52,11 @@ public static class MedicalRecordService
         CancelPrescriptionCore(record, GetActivePrescription(record, itemId), author, EventTime(record, now));
     }
 
-    public static Prescription ReplacePrescription(MedicalRecord record, Guid itemId, string text, MedicalWorker author, DateTimeOffset now)
+    public static Prescription ReplacePrescription(MedicalRecord record, Guid itemId, string text, MedicalWorker author,
+        DateTimeOffset now)
     {
         ValidateAuthor(author);
         var original = GetActivePrescription(record, itemId);
-        // Создание и проверка замены до отмены исходной записи сохраняют атомарность бизнес-операции.
         var at = EventTime(record, now);
         var replacement = PrescriptionFactory.Create(record.Id, text, author.Id, at, original.Id);
         CancelPrescriptionCore(record, original, author, at);
@@ -62,20 +67,24 @@ public static class MedicalRecordService
     private static Prescription GetActivePrescription(MedicalRecord record, Guid itemId)
     {
         var prescription = record.Prescriptions.SingleOrDefault(x => x.Id == itemId)
-            ?? throw new DomainEntityNotFoundException("Назначение в этой медицинской карте не найдено.");
+                           ?? throw new DomainEntityNotFoundException(
+                               "Назначение в этой медицинской карте не найдено.");
         if (prescription.CancelledAtUtc is not null)
             throw new BusinessRuleConflictException("Назначение уже отменено.");
         return prescription;
     }
 
-    private static void AppendPrescription(MedicalRecord record, Prescription prescription, MedicalWorker author, DateTimeOffset at)
+    private static void AppendPrescription(MedicalRecord record, Prescription prescription, MedicalWorker author,
+        DateTimeOffset at)
     {
         record.Prescriptions = record.Prescriptions.Append(prescription).ToList().AsReadOnly();
         AppendEvent(record, MedicalRecordEventType.PrescriptionAdded, prescription.Id,
-            new PrescriptionAddedPayload(prescription.Id, prescription.Text, prescription.ReplacesPrescriptionId), author, at);
+            new PrescriptionAddedPayload(prescription.Id, prescription.Text, prescription.ReplacesPrescriptionId),
+            author, at);
     }
 
-    private static void CancelPrescriptionCore(MedicalRecord record, Prescription prescription, MedicalWorker author, DateTimeOffset at)
+    private static void CancelPrescriptionCore(MedicalRecord record, Prescription prescription, MedicalWorker author,
+        DateTimeOffset at)
     {
         prescription.CancelledAtUtc = at;
         prescription.CancelledByMedicalWorkerId = author.Id;
@@ -83,18 +92,19 @@ public static class MedicalRecordService
             new PrescriptionCancelledPayload(prescription.Id, prescription.Text), author, at);
     }
 
-    private static void AppendEvent<TPayload>(MedicalRecord record, MedicalRecordEventType type, Guid? entityId, TPayload payload,
+    private static void AppendEvent<TPayload>(MedicalRecord record, MedicalRecordEventType type, Guid? entityId,
+        TPayload payload,
         MedicalWorker author, DateTimeOffset at)
     {
         var version = record.Version + 1;
-        var historyEvent = MedicalRecordHistoryEventFactory.Create(record.Id, version, type, entityId, payload, author, at);
+        var historyEvent =
+            MedicalRecordHistoryEventFactory.Create(record.Id, version, type, entityId, payload, author, at);
         record.HistoryEvents = record.HistoryEvents.Append(historyEvent).ToList().AsReadOnly();
         record.Version = version;
     }
 
     private static DateTimeOffset EventTime(MedicalRecord record, DateTimeOffset now)
     {
-        // Порядок коллекции после маппинга из БД может отличаться от порядка версий.
         var previous = record.HistoryEvents.MaxBy(x => x.Version)?.OccurredAtUtc ?? record.CreatedAtUtc;
         var requested = now.ToUniversalTime();
         return requested < previous ? previous : requested;

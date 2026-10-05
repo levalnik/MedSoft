@@ -5,35 +5,53 @@
 <PageTitle>Диагнозы · Учебная HIS</PageTitle>
 <div class="eyebrow"><span class="eyebrow-line"></span> СПРАВОЧНИКИ УЧРЕЖДЕНИЯ</div>
 <div class="page-heading">
-  <div><h1>Справочник диагнозов</h1><p>Коды и наименования для электронных медицинских карт.</p></div>
+  <div><h1>Справочник диагнозов</h1>
+    <p>Коды и наименования для электронных медицинских карт.</p></div>
 </div>
 
 <section class="surface diagnosis-import" aria-labelledby="import-title" aria-busy="@_importing">
-  <div class="registry-heading"><div><h2 id="import-title">Импорт из CSV</h2><p>Добавьте диагнозы или обновите названия по их кодам.</p></div><span class="section-index">01 / ИМПОРТ</span></div>
+  <div class="registry-heading">
+    <div><h2 id="import-title">Импорт из CSV</h2>
+      <p>Добавьте диагнозы или обновите названия по их кодам.</p></div>
+    <span class="section-index">01 / ИМПОРТ</span></div>
   <div class="import-content">
-    <p id="csv-help">Файл UTF-8 до 1 МиБ, не более 10 000 записей. Заголовок <code>Code,Name</code>, разделитель — запятая.
+    <p id="csv-help">Файл UTF-8 до 1 МиБ, не более 10 000 записей. Заголовок <code>Code,Name</code>, разделитель —
+      запятая.
       Код — 6 символов, название — от 3 до 24. Значения с запятой заключайте в двойные кавычки.</p>
-    <p>Коды и названия внутри файла должны быть уникальны. Название, занятое другим кодом в справочнике, вызовет конфликт.
+    <p>Коды и названия внутри файла должны быть уникальны. Название, занятое другим кодом в справочнике, вызовет
+      конфликт.
       При ошибке весь импорт отменяется.</p>
     <div class="import-controls">
-      <div><label for="diagnosis-csv">CSV-файл</label><InputFile id="diagnosis-csv" class="form-control" accept=".csv,text/csv" OnChange="SelectFile" disabled="@_importing" aria-describedby="csv-help" /></div>
-      <button class="btn btn-primary" disabled="@(_file is null || _importing)" @onclick="ImportAsync">@(_importing ? "Импортируем…" : "Импортировать")</button>
+      <div><label for="diagnosis-csv">CSV-файл</label>
+        <InputFile id="diagnosis-csv" class="form-control" accept=".csv,text/csv" OnChange="SelectFile"
+                   disabled="@_importing" aria-describedby="csv-help"/>
+      </div>
+      <button class="btn btn-primary" disabled="@(_file is null || _importing || _loading)"
+              @onclick="ImportAsync">@(_importing ? "Импортируем…" : "Импортировать")</button>
       <a href="examples/diagnoses.csv" download="diagnoses.csv">Скачать пример</a>
     </div>
-    <ErrorAlert Message="@_importError" />
+    <ErrorAlert Message="@_importError"/>
     @if (_result is not null)
     {
-      <div class="import-result" role="status">Импорт завершён. Добавлено: @_result.Created · Обновлено: @_result.Updated · Без изменений: @_result.Unchanged</div>
+      <div class="import-result" role="status">Импорт завершён. Добавлено: @_result.Created ·
+        Обновлено: @_result.Updated · Без изменений: @_result.Unchanged</div>
     }
   </div>
 </section>
 
-<ErrorAlert Message="@_listError" />
+<ErrorAlert Message="@_listError"/>
 <section class="surface" aria-label="Список диагнозов">
-  <div class="registry-heading"><div><h2>Диагнозы учреждения</h2><p>Справочник обновляется после успешного импорта.</p></div><span class="section-index">02 / РЕЕСТР</span></div>
+  <div class="registry-heading">
+    <div><h2>Диагнозы учреждения</h2>
+      <p>Справочник обновляется после успешного импорта.</p></div>
+    <span class="section-index">02 / РЕЕСТР</span></div>
   <div class="table-toolbar">
-    <div class="search-field"><Icon Name="search" /><input type="search" aria-label="Поиск диагноза" placeholder="Код или название диагноза" @bind="_search" @bind:event="oninput" /></div>
-    <button class="btn btn-outline-primary" disabled="@(_loading || _importing)" @onclick="LoadAsync">Обновить список</button>
+    <div class="search-field">
+      <Icon Name="search"/>
+      <input type="search" aria-label="Поиск диагноза" placeholder="Код или название диагноза" @bind="_search"
+             @bind:event="oninput"/></div>
+    <button class="btn btn-outline-primary" disabled="@(_loading || _importing)" @onclick="LoadAsync">Обновить список
+    </button>
   </div>
   @if (_loading)
   {
@@ -45,72 +63,117 @@
   }
   else
   {
-    <div class="table-responsive"><table class="table diagnosis-table">
-      <thead><tr><th scope="col">Код</th><th scope="col">Наименование</th></tr></thead>
-      <tbody>@foreach (var diagnosis in VisibleDiagnoses)
-      {
-        <tr @key="diagnosis.Id"><td><code>@diagnosis.Code</code></td><td>@diagnosis.Name</td></tr>
-      }</tbody>
-    </table></div>
+    <div class="table-responsive">
+      <table class="table diagnosis-table">
+        <thead>
+        <tr>
+          <th scope="col">Код</th>
+          <th scope="col">Наименование</th>
+        </tr>
+        </thead>
+        <tbody>@foreach (var diagnosis in VisibleDiagnoses)
+        {
+          <tr @key="diagnosis.Id">
+            <td><code>@diagnosis.Code</code></td>
+            <td>@diagnosis.Name</td>
+          </tr>
+        }
+        </tbody>
+      </table>
+    </div>
     @if (!VisibleDiagnoses.Any())
     {
-      <div class="empty-state">@(_diagnoses.Count == 0 ? "В справочнике пока нет диагнозов. Загрузите CSV-файл выше." : "По вашему запросу ничего не найдено.")</div>
+      <div
+        class="empty-state">@(_diagnoses.Count == 0 ? "В справочнике пока нет диагнозов. Загрузите CSV-файл выше." : "По вашему запросу ничего не найдено.")</div>
     }
+
     <div class="table-footer"><span>Показано @VisibleDiagnoses.Count() из @_diagnoses.Count диагнозов</span></div>
   }
 </section>
 
 @code {
-    private IReadOnlyList<DiagnosisDefinitionDto>? _diagnoses;
-    private IBrowserFile? _file;
-    private DiagnosisImportResultDto? _result;
-    private string? _importError;
-    private string? _listError;
-    private string _search = "";
-    private bool _loading = true;
-    private bool _importing;
-    private IEnumerable<DiagnosisDefinitionDto> VisibleDiagnoses => (_diagnoses ?? [])
-        .Where(x => $"{x.Code} {x.Name}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+  private IReadOnlyList<DiagnosisDefinitionDto>? _diagnoses;
+  private IBrowserFile? _file;
+  private DiagnosisImportResultDto? _result;
+  private string? _importError;
+  private string? _listError;
+  private string _search = "";
+  private bool _loading = true;
+  private bool _importing;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+  private IEnumerable<DiagnosisDefinitionDto> VisibleDiagnoses => (_diagnoses ?? [])
+    .Where(x => $"{x.Code} {x.Name}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    private void SelectFile(InputFileChangeEventArgs args)
+  protected override Task OnInitializedAsync() => LoadAsync();
+
+  private void SelectFile(InputFileChangeEventArgs args)
+  {
+    _file = null;
+    _result = null;
+    _importError = null;
+    if (args.File.Size == 0) _importError = "Выбранный файл пуст.";
+    else if (args.File.Size > DiagnosisImportLimits.MaxFileBytes) _importError = "Размер файла не должен превышать 1 МиБ.";
+    else _file = args.File;
+  }
+
+  private async Task ImportAsync()
+  {
+    if (_file is null || _importing || _loading) return;
+    _importing = true;
+    _importError = null;
+    _result = null;
+    try
     {
-        _file = null;
-        _result = null;
-        _importError = null;
-        if (args.File.Size == 0) _importError = "Выбранный файл пуст.";
-        else if (args.File.Size > DiagnosisImportLimits.MaxFileBytes) _importError = "Размер файла не должен превышать 1 МиБ.";
-        else _file = args.File;
+      await using var stream = _file.OpenReadStream(DiagnosisImportLimits.MaxFileBytes);
+      _result = await Api.ImportAsync(stream, _file.Name);
+      await LoadAsync();
     }
-
-    private async Task ImportAsync()
+    catch (ApiException e)
     {
-        if (_file is null || _importing) return;
-        _importing = true;
-        _importError = null;
-        _result = null;
-        try
-        {
-            await using var stream = _file.OpenReadStream(DiagnosisImportLimits.MaxFileBytes);
-            _result = await Api.ImportAsync(stream, _file.Name);
-            await LoadAsync();
-        }
-        catch (ApiException e) { _importError = e.Message; }
-        catch (HttpRequestException) { _importError = "Соединение с сервером прервано. Обновите список, чтобы проверить результат импорта."; }
-        catch (TaskCanceledException) { _importError = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат импорта."; }
-        catch (IOException) { _importError = "Не удалось прочитать файл. Выберите его повторно."; }
-        finally { _importing = false; }
+      _importError = e.Message;
     }
-
-    private async Task LoadAsync()
+    catch (HttpRequestException)
     {
-        _loading = true;
-        _listError = null;
-        try { _diagnoses = await Api.ListAsync(); }
-        catch (ApiException e) { _listError = e.Message; }
-        catch (HttpRequestException) { _listError = "Не удалось обновить список: сервер недоступен."; }
-        catch (TaskCanceledException) { _listError = "Не удалось обновить список: сервер не ответил вовремя."; }
-        finally { _loading = false; }
+      _importError = "Соединение с сервером прервано. Обновите список, чтобы проверить результат импорта.";
     }
+    catch (TaskCanceledException)
+    {
+      _importError = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат импорта.";
+    }
+    catch (IOException)
+    {
+      _importError = "Не удалось прочитать файл. Выберите его повторно.";
+    }
+    finally
+    {
+      _importing = false;
+    }
+  }
+
+  private async Task LoadAsync()
+  {
+    _loading = true;
+    _listError = null;
+    try
+    {
+      _diagnoses = await Api.ListAsync();
+    }
+    catch (ApiException e)
+    {
+      _listError = e.Message;
+    }
+    catch (HttpRequestException)
+    {
+      _listError = "Не удалось обновить список: сервер недоступен.";
+    }
+    catch (TaskCanceledException)
+    {
+      _listError = "Не удалось обновить список: сервер не ответил вовремя.";
+    }
+    finally
+    {
+      _loading = false;
+    }
+  }
+
 }

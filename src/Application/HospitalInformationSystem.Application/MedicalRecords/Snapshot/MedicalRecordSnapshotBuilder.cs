@@ -10,7 +10,7 @@ public sealed class MedicalRecordSnapshotBuilder(IMedicalRecordRepository reposi
         Guid medicalRecordId, DateTimeOffset at, CancellationToken cancellationToken)
     {
         var record = await repository.FindAsync(medicalRecordId, tracking: false, cancellationToken)
-            ?? throw new EntityNotFoundException("Медицинская карта не найдена.");
+                     ?? throw new EntityNotFoundException("Медицинская карта не найдена.");
         return MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents, at);
     }
 }

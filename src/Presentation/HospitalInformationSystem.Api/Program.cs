@@ -3,6 +3,7 @@ using HospitalInformationSystem.Application;
 using HospitalInformationSystem.Application.DI;
 using HospitalInformationSystem.Infrastructure;
 using HospitalInformationSystem.Infrastructure.Contexts;
+using HospitalInformationSystem.Infrastructure.DI;
 using HospitalInformationSystem.Infrastructure.Initializers;
 using HospitalInformationSystem.Infrastructure.Persistence;
 

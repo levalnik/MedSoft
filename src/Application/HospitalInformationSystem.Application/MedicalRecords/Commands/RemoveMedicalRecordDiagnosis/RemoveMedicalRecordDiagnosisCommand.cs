@@ -3,4 +3,7 @@ using MediatR;
 
 namespace HospitalInformationSystem.Application.MedicalRecords.Commands.RemoveMedicalRecordDiagnosis;
 
-public sealed record RemoveMedicalRecordDiagnosisCommand(Guid MedicalRecordId, Guid MedicalRecordDiagnosisId, Guid MedicalWorkerId) : IRequest;
+public sealed record RemoveMedicalRecordDiagnosisCommand(
+    Guid MedicalRecordId,
+    Guid MedicalRecordDiagnosisId,
+    Guid MedicalWorkerId) : IRequest;

@@ -8,6 +8,8 @@ public static class DiagnosisDefinitionService
     {
         var validCode = code?.Trim();
         var validName = name?.Trim();
+        TextValidation.RejectNullCharacter(validCode, "Код диагноза");
+        TextValidation.RejectNullCharacter(validName, "Название диагноза");
         if (validCode?.Length != 6)
             throw new DomainValidationException("Код диагноза: требуется ровно 6 символов.");
         if (validName is null || validName.Length is < 3 or > 24)

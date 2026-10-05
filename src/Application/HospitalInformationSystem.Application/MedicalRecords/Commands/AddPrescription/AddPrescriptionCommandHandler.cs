@@ -15,6 +15,6 @@ public sealed class AddPrescriptionCommandHandler(MedicalRecordCommandContext co
         var record = await context.RequireRecordAsync(request.MedicalRecordId, cancellationToken);
         var result = MedicalRecordService.AddPrescription(record, request.Text, author, context.Now);
         await context.SaveChangesAsync(record, cancellationToken);
-        return result.ToDto();
+        return Mapping.MedicalRecordMapping.ToDto(result);
     }
 }

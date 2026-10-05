@@ -50,4 +50,3 @@ public sealed class DiagnosisDefinitionTests
         diagnosis.UpdatedAtUtc.Should().Be(Now);
     }
 }
-

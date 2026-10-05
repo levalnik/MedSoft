@@ -2,7 +2,7 @@ using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Domain.MedicalWorkers;
 using Riok.Mapperly.Abstractions;
 
-namespace HospitalInformationSystem.Application.MedicalWorkers;
+namespace HospitalInformationSystem.Application.MedicalWorkers.Mapping;
 
 [Mapper]
 internal static partial class MedicalWorkerMapping

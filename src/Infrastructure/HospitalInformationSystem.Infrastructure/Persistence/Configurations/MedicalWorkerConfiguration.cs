@@ -10,7 +10,8 @@ public sealed class MedicalWorkerConfiguration : IEntityTypeConfiguration<Medica
     {
         builder.ToTable("medical_workers", table =>
         {
-            table.HasCheckConstraint("ck_medical_workers_first_name", "char_length(btrim(first_name)) BETWEEN 3 AND 24");
+            table.HasCheckConstraint("ck_medical_workers_first_name",
+                "char_length(btrim(first_name)) BETWEEN 3 AND 24");
             table.HasCheckConstraint("ck_medical_workers_last_name", "char_length(btrim(last_name)) BETWEEN 3 AND 24");
             table.HasCheckConstraint("ck_medical_workers_position", "char_length(btrim(position)) BETWEEN 3 AND 24");
         });

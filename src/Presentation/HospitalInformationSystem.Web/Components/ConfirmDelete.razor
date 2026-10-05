@@ -1,20 +1,43 @@
 @if (Worker is not null)
 {
-  <div class="confirm-panel" role="alertdialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+  <div class="confirm-panel" role="alertdialog" aria-labelledby="delete-title" aria-describedby="delete-description"
+       tabindex="-1" @ref="_panel" @onkeydown="HandleKeyDownAsync">
     <div>
       <strong id="delete-title">Пометить медработника как удалённого?</strong>
       <p id="delete-description">@Worker.LastName @Worker.FirstName — запись останется в системе.</p>
     </div>
     <div class="button-row">
-      <button class="btn btn-danger" disabled="@Busy" @onclick="OnConfirm">@(Busy ? "Удаление…" : "Подтвердить удаление")</button>
+      <button class="btn btn-danger" disabled="@Busy"
+              @onclick="OnConfirm">@(Busy ? "Удаление…" : "Подтвердить удаление")</button>
       <button class="btn btn-light" disabled="@Busy" @onclick="OnCancel">Отмена</button>
     </div>
   </div>
 }
 
 @code {
-    [Parameter] public MedicalWorkerDto? Worker { get; set; }
-    [Parameter] public bool Busy { get; set; }
-    [Parameter] public EventCallback OnConfirm { get; set; }
-    [Parameter] public EventCallback OnCancel { get; set; }
+  [Parameter] public MedicalWorkerDto? Worker { get; set; }
+  [Parameter] public bool Busy { get; set; }
+  [Parameter] public EventCallback OnConfirm { get; set; }
+  [Parameter] public EventCallback OnCancel { get; set; }
+  private ElementReference _panel;
+  private Guid? _previousWorkerId;
+  private bool _focusRequested;
+
+  protected override void OnParametersSet()
+  {
+    _focusRequested = Worker is not null && Worker.Id != _previousWorkerId;
+    _previousWorkerId = Worker?.Id;
+  }
+
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    if (!_focusRequested) return;
+    _focusRequested = false;
+    await _panel.FocusAsync();
+  }
+
+  private Task HandleKeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" && !Busy
+    ? OnCancel.InvokeAsync()
+    : Task.CompletedTask;
+
 }
