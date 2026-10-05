@@ -23,14 +23,12 @@ public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> option
     {
         try
         {
-            // Все изменения текущего состояния и истории сохраняются одной транзакцией EF.
             return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         }
         catch (DbUpdateConcurrencyException exception)
         {
             throw new BusinessConflictException("Данные уже изменены другим запросом. Обновите страницу и повторите операцию.", exception);
         }
-        // Npgsql оборачивает deadlock/serialization в InvalidOperationException поверх DbUpdateException.
         catch (Exception exception) when (exception.GetBaseException() is PostgresException postgres &&
             postgres.SqlState is PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.ForeignKeyViolation
                 or PostgresErrorCodes.CheckViolation or PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected)

@@ -12,7 +12,6 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Repositories;
 
 public sealed class MedicalRecordRepository(HospitalDbContext db) : IMedicalRecordRepository, IMedicalRecordPresence
 {
-    // Коллекции читаются отдельно, чтобы число строк не росло как diagnoses × prescriptions × events.
     private IQueryable<MedicalRecordDbo> AggregateQuery(bool tracking) =>
         (tracking ? db.MedicalRecords : db.MedicalRecords.AsNoTracking())
         .Include(x => x.Diagnoses).Include(x => x.Prescriptions).Include(x => x.HistoryEvents)
@@ -28,12 +27,9 @@ public sealed class MedicalRecordRepository(HospitalDbContext db) : IMedicalReco
         Expression<Func<MedicalRecordDbo, bool>> predicate, bool tracking, CancellationToken cancellationToken)
     {
         var query = AggregateQuery(tracking);
-        // При внешней транзакции с неизвестной изоляцией один SQL сохраняет согласованность.
         if (db.Database.CurrentTransaction is not null)
             return (await query.AsSingleQuery().SingleOrDefaultAsync(predicate, cancellationToken))?.ToDomain();
 
-        // PostgreSQL REPEATABLE READ фиксирует общий снимок для заголовка и всех трёх коллекций.
-        // Транзакция заканчивается после чтения; запись по-прежнему проверяет исходную Version.
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         var row = await query.SingleOrDefaultAsync(predicate, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -48,7 +44,6 @@ public sealed class MedicalRecordRepository(HospitalDbContext db) : IMedicalReco
         var row = db.MedicalRecords.Local.SingleOrDefault(x => x.Id == record.Id)
             ?? throw new InvalidOperationException("Перед изменением ЭМК загрузите её с tracking: true в том же Unit of Work.");
 
-        // OriginalValue остаётся версией, прочитанной командой: UPDATE ... WHERE version = original.
         row.Version = record.Version;
         var diagnoses = row.Diagnoses.ToDictionary(x => x.Id);
         foreach (var diagnosis in record.Diagnoses)

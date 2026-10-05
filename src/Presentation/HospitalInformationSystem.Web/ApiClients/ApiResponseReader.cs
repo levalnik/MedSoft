@@ -31,7 +31,6 @@ internal static class ApiResponseReader
         where T : class
     {
         var items = await ReadAsync<T[]>(response, cancellationToken);
-        // Nullable annotation enforcement does not cover collection elements.
         if (items.Any(item => item is null)) throw new ApiException(InvalidResponseMessage);
         return items;
     }
@@ -42,7 +41,7 @@ internal static class ApiResponseReader
 
         ProblemResponse? problem = null;
         try { problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken); }
-        catch (JsonException) { /* A proxy may return an empty or non-JSON error. */ }
+        catch (JsonException) { }
 
         var errors = problem?.Errors?.Values
             .SelectMany(values => values ?? [])

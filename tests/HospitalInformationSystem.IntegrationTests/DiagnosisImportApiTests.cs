@@ -82,7 +82,6 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     [Fact]
     public async Task Database_failure_rolls_back_updates_and_inserts_across_batches()
     {
-        // A real PostgreSQL constraint failure during SaveChanges, after validation.
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
         (await ImportAsync("Code,Name\nR00000,До импорта")).EnsureSuccessStatusCode();

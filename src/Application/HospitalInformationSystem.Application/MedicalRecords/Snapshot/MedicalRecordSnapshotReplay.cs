@@ -114,7 +114,6 @@ public static class MedicalRecordSnapshotReplay
             version = item.Version;
             previousTime = item.OccurredAtUtc;
         }
-        // Отсутствие последних событий нельзя обнаружить проверкой промежутков до выбранного at.
         Require(version == record.Version, "последняя версия истории не совпадает с версией карты");
     }
 

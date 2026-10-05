@@ -38,8 +38,6 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
         problem.Extensions["traceId"] = context.TraceIdentifier;
         if (!await problemDetailsService.TryWriteAsync(new ProblemDetailsContext { HttpContext = context, ProblemDetails = problem }))
         {
-            // Unsupported Accept headers must not turn a handled 400/404/409 into 500.
-            // Serialize the runtime type so ValidationProblemDetails keeps its errors.
             await context.Response.WriteAsJsonAsync((object)problem, options: null,
                 contentType: "application/problem+json", cancellationToken: cancellationToken);
         }

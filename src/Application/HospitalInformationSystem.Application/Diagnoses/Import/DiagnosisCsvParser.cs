@@ -9,7 +9,6 @@ public static class DiagnosisCsvParser
 {
     public static IReadOnlyList<DiagnosisCsvRow> Parse(string csv, CancellationToken cancellationToken = default)
     {
-        // TextFieldParser skips blank physical lines. Keep their positions for diagnostics.
         var physicalLines = csv.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         using var reader = new StringReader(csv.TrimStart('\uFEFF'));
         using var parser = new TextFieldParser(reader)

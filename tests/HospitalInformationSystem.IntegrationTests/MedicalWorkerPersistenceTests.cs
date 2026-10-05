@@ -70,7 +70,6 @@ public sealed class MedicalWorkerPersistenceTests(HospitalApiFactory factory) : 
             restored.UpdatedAtUtc.Should().Be(deletedAt);
             MedicalWorkerService.MarkAsDeleted(restored, deletedAt.AddHours(1));
             restored.UpdatedAtUtc.Should().Be(deletedAt);
-            // UpdateAsync также умеет загрузить DBO, если чтение было без tracking.
             await repository.UpdateAsync(restored, CancellationToken.None);
             (await db.SaveChangesAsync()).Should().Be(0);
         }

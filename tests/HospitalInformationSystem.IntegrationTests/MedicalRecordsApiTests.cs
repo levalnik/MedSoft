@@ -241,7 +241,6 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
         await observation.HeaderRead.Task.WaitAsync(TimeSpan.FromSeconds(15));
         try
         {
-            // Коммит между чтением версии и коллекций не должен попадать в исходный снимок.
             await AddPrescription(record.Id, "Параллельное назначение", worker);
         }
         finally
@@ -343,7 +342,6 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
         var historyTable = Table(db, "MedicalRecordHistoryEventDbo");
         var prescriptionTable = Table(db, "PrescriptionDbo");
         var rowCount = await CountRows(db, prescriptionTable, "medical_record_id", record.Id);
-        // Код ошибки выбирается только из двух констант: проверяем и оболочку transient failure Npgsql.
         var createFunctionSql = """
             CREATE FUNCTION reject_test_history_insert() RETURNS trigger AS $$
             BEGIN
@@ -354,7 +352,6 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
         await db.Database.ExecuteSqlRawAsync(createFunctionSql);
         try
         {
-            // Идентификатор таблицы берётся только из EF metadata и экранируется в Table().
             var createTriggerSql = $"CREATE TRIGGER reject_test_history_insert BEFORE INSERT ON {historyTable} FOR EACH ROW EXECUTE FUNCTION reject_test_history_insert()";
             await db.Database.ExecuteSqlRawAsync(createTriggerSql);
             await Expect(await Send(HttpMethod.Put, $"/api/medical-records/{record.Id}/prescriptions/{prescription.Id}", worker,
@@ -477,7 +474,6 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
 
     private static Task<int> CountRows(HospitalDbContext db, string table, string column, Guid id)
     {
-        // Идентификаторы экранированы; значения передаются SQL-параметрами.
         var sql = $"SELECT count(*)::int AS \"Value\" FROM {table} WHERE {Quote(column)} = {{0}}";
         return db.Database.SqlQueryRaw<int>(sql, id).SingleAsync();
     }

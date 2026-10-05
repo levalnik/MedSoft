@@ -51,7 +51,6 @@ public static class MedicalRecordService
     {
         ValidateAuthor(author);
         var original = GetActivePrescription(record, itemId);
-        // Создание и проверка замены до отмены исходной записи сохраняют атомарность бизнес-операции.
         var at = EventTime(record, now);
         var replacement = PrescriptionFactory.Create(record.Id, text, author.Id, at, original.Id);
         CancelPrescriptionCore(record, original, author, at);
@@ -94,7 +93,6 @@ public static class MedicalRecordService
 
     private static DateTimeOffset EventTime(MedicalRecord record, DateTimeOffset now)
     {
-        // Порядок коллекции после маппинга из БД может отличаться от порядка версий.
         var previous = record.HistoryEvents.MaxBy(x => x.Version)?.OccurredAtUtc ?? record.CreatedAtUtc;
         var requested = now.ToUniversalTime();
         return requested < previous ? previous : requested;

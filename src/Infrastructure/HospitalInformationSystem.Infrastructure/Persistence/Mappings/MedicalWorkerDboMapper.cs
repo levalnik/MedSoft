@@ -11,7 +11,6 @@ internal static partial class MedicalWorkerDboMapper
 
     public static partial MedicalWorkerDbo ToDbo(this MedicalWorker worker);
 
-    // Обновляем тот же DBO, который отслеживает EF, сохраняя ключ и дату создания.
     [MapperIgnoreSource(nameof(MedicalWorker.Id))]
     [MapperIgnoreSource(nameof(MedicalWorker.CreatedAtUtc))]
     [MapperIgnoreTarget(nameof(MedicalWorkerDbo.Id))]

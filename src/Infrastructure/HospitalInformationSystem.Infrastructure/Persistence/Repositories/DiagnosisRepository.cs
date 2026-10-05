@@ -21,8 +21,6 @@ public sealed class DiagnosisRepository(HospitalDbContext db) : IDiagnosisReposi
     public async Task<IReadOnlyList<DiagnosisDefinition>> FindImportMatchesAsync(
         IReadOnlyCollection<string> codes, IReadOnlyCollection<string> names, CancellationToken cancellationToken)
     {
-        // Keep matched DBOs tracked so UpdateAsync can reuse them without a
-        // separate database lookup for every imported row.
         var rows = await db.DiagnosisDefinitions.AsTracking()
             .Where(x => codes.Contains(x.Code) || names.Contains(x.Name))
             .ToListAsync(cancellationToken);

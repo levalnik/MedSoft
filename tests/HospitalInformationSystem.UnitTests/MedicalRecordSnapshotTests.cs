@@ -109,7 +109,6 @@ public sealed class MedicalRecordSnapshotTests
     public void Replay_uses_payload_even_if_current_state_and_catalog_reference_are_missing()
     {
         var (record, diagnosis, original, _) = Scenario();
-        // Снимок не читает текущие дочерние записи: вся информация берётся из событий.
         var withoutCurrentState = new MedicalRecord
         {
             Id = record.Id, PatientId = record.PatientId, CreatedAtUtc = record.CreatedAtUtc,

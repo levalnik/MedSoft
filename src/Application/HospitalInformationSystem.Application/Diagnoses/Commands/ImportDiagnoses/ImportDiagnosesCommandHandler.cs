@@ -42,8 +42,6 @@ public sealed class ImportDiagnosesCommandHandler(
         var existing = await repository.FindImportMatchesAsync(codes, names, cancellationToken);
         var byCode = existing.ToDictionary(x => x.Code, StringComparer.Ordinal);
         var byName = existing.ToDictionary(x => x.Name, StringComparer.Ordinal);
-        // A name already belonging to another code is a conflict, even if that
-        // other code is also in this file. No writes occur until all rows pass.
         foreach (var (row, diagnosis) in candidates)
             if (byName.TryGetValue(diagnosis.Name, out var owner) && owner.Code != diagnosis.Code)
                 throw new BusinessConflictException(
@@ -68,8 +66,6 @@ public sealed class ImportDiagnosesCommandHandler(
                 updated++;
             }
         }
-        // EF Core wraps this single SaveChanges in a transaction, including
-        // all batches. Database constraint failures roll back the entire file.
         if (created + updated > 0)
             await unitOfWork.SaveChangesAsync(cancellationToken);
         return new DiagnosisImportResultDto(created, updated, unchanged);

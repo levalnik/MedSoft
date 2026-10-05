@@ -52,8 +52,6 @@ public sealed class MedicalRecordsApiFactory : WebApplicationFactory<Program>, I
     }
 }
 
-// Останавливает чтение после SQL заголовка карты и наблюдает только этот DbContext.
-// Параллельный HTTP-запрос может изменить карту до загрузки её дочерних коллекций.
 public sealed class MedicalRecordReadProbe : DbCommandInterceptor
 {
     private ReadObservation? _observation;
@@ -97,8 +95,6 @@ public sealed class MedicalRecordReadProbe : DbCommandInterceptor
     }
 }
 
-// Задерживает уже выполненные чтения до получения обоими запросами одной версии.
-// Так проверка конфликта не зависит от того, успел ли первый HTTP-запрос завершиться раньше второго.
 public sealed class ConcurrentRecordReadGate : DbCommandInterceptor
 {
     private ReadPair? _pair;
