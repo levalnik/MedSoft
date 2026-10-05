@@ -21,7 +21,8 @@ public static class MedicalRecordSnapshotReplay
         var diagnosisIds = new HashSet<Guid>();
         var prescriptionIds = new HashSet<Guid>();
         var cancelledPrescriptionIds = new HashSet<Guid>();
-        var events = historyEvents.Where(x => x.OccurredAtUtc <= at).OrderBy(x => x.Version);
+        var completeHistory = historyEvents.OrderBy(x => x.Version).ToArray();
+        var events = completeHistory.Where(x => x.OccurredAtUtc <= at);
         var version = 0L;
         var previousTime = record.CreatedAtUtc;
 
@@ -96,8 +97,25 @@ public static class MedicalRecordSnapshotReplay
         }
 
         Require(version > 0, "отсутствует событие создания карты");
+        ValidateCompleteHistory(record, completeHistory);
         return new MedicalRecordSnapshotDto(record.Id, record.PatientId, at, version,
             diagnoses.Values.ToArray(), prescriptions.Values.ToArray());
+    }
+
+    private static void ValidateCompleteHistory(MedicalRecord record, IReadOnlyList<MedicalRecordHistoryEvent> history)
+    {
+        var version = 0L;
+        var previousTime = record.CreatedAtUtc;
+        foreach (var item in history)
+        {
+            Require(item.MedicalRecordId == record.Id, "событие принадлежит другой карте");
+            Require(item.Version == version + 1, "нарушена последовательность версий");
+            Require(item.OccurredAtUtc >= previousTime, "время события меньше времени предыдущего");
+            version = item.Version;
+            previousTime = item.OccurredAtUtc;
+        }
+        // Отсутствие последних событий нельзя обнаружить проверкой промежутков до выбранного at.
+        Require(version == record.Version, "последняя версия истории не совпадает с версией карты");
     }
 
     private static T Read<T>(MedicalRecordHistoryEvent item) where T : class

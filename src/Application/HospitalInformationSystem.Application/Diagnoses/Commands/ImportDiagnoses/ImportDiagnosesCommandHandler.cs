@@ -39,7 +39,7 @@ public sealed class ImportDiagnosesCommandHandler(
         }
         if (errors.Count > 0) throw new ValidationException(errors);
 
-        var existing = await repository.ListAsync(cancellationToken);
+        var existing = await repository.FindImportMatchesAsync(codes, names, cancellationToken);
         var byCode = existing.ToDictionary(x => x.Code, StringComparer.Ordinal);
         var byName = existing.ToDictionary(x => x.Name, StringComparer.Ordinal);
         // A name already belonging to another code is a conflict, even if that

@@ -18,6 +18,17 @@ public sealed class DiagnosisRepository(HospitalDbContext db) : IDiagnosisReposi
         return rows.Select(x => x.ToDomain()).ToArray();
     }
 
+    public async Task<IReadOnlyList<DiagnosisDefinition>> FindImportMatchesAsync(
+        IReadOnlyCollection<string> codes, IReadOnlyCollection<string> names, CancellationToken cancellationToken)
+    {
+        // Keep matched DBOs tracked so UpdateAsync can reuse them without a
+        // separate database lookup for every imported row.
+        var rows = await db.DiagnosisDefinitions.AsTracking()
+            .Where(x => codes.Contains(x.Code) || names.Contains(x.Name))
+            .ToListAsync(cancellationToken);
+        return rows.Select(x => x.ToDomain()).ToArray();
+    }
+
     public async Task<DiagnosisDefinition?> FindAsync(Guid id, bool tracking, CancellationToken cancellationToken)
     {
         var query = tracking ? db.Set<DiagnosisDefinitionDbo>() : db.Set<DiagnosisDefinitionDbo>().AsNoTracking();
@@ -46,4 +57,3 @@ public sealed class DiagnosisRepository(HospitalDbContext db) : IDiagnosisReposi
         db.Set<DiagnosisDefinitionDbo>().Remove(row);
     }
 }
-

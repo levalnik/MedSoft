@@ -11,6 +11,8 @@ public static class PatientService
         var validLastName = RequiredName(lastName, "Фамилия");
         var validMiddleName = OptionalText(middleName);
         var validComment = OptionalText(comment);
+        TextValidation.RejectNullCharacter(validMiddleName, "Отчество");
+        TextValidation.RejectNullCharacter(validComment, "Комментарий");
         if (validMiddleName?.Length > 64)
             throw new DomainValidationException("Отчество: допускается не более 64 символов.");
         if (validComment?.Length > 32)
@@ -30,6 +32,7 @@ public static class PatientService
     private static string RequiredName(string? value, string label)
     {
         var normalized = value?.Trim();
+        TextValidation.RejectNullCharacter(normalized, label);
         if (normalized is null || normalized.Length is < 1 or > 64)
             throw new DomainValidationException($"{label}: требуется от 1 до 64 символов.");
         return normalized;

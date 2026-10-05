@@ -20,6 +20,10 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
                 Status = 400, Title = "Проверьте введённые данные."
             },
             DomainValidationException => new ProblemDetails { Status = 400, Title = "Некорректные данные.", Detail = exception.Message },
+            BadHttpRequestException badRequest => new ProblemDetails
+            {
+                Status = badRequest.StatusCode, Title = "Некорректный HTTP-запрос."
+            },
             EntityNotFoundException => new ProblemDetails { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
             DomainEntityNotFoundException => new ProblemDetails { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
             BusinessConflictException or BusinessRuleConflictException => new ProblemDetails
@@ -32,7 +36,13 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
         context.Response.StatusCode = problem.Status!.Value;
         problem.Instance = context.Request.Path;
         problem.Extensions["traceId"] = context.TraceIdentifier;
-        await problemDetailsService.WriteAsync(new ProblemDetailsContext { HttpContext = context, ProblemDetails = problem });
+        if (!await problemDetailsService.TryWriteAsync(new ProblemDetailsContext { HttpContext = context, ProblemDetails = problem }))
+        {
+            // Unsupported Accept headers must not turn a handled 400/404/409 into 500.
+            // Serialize the runtime type so ValidationProblemDetails keeps its errors.
+            await context.Response.WriteAsJsonAsync((object)problem, options: null,
+                contentType: "application/problem+json", cancellationToken: cancellationToken);
+        }
         return true;
     }
 }

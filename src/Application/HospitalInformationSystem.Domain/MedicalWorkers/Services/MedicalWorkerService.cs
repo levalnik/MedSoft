@@ -25,6 +25,7 @@ public static class MedicalWorkerService
     private static string Validate(string? value, string label)
     {
         var normalized = value?.Trim();
+        TextValidation.RejectNullCharacter(normalized, label);
         if (normalized is null || normalized.Length is < 3 or > 24)
             throw new DomainValidationException($"{label}: требуется от 3 до 24 символов.");
         return normalized;

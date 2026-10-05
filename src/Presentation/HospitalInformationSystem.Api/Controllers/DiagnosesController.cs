@@ -42,7 +42,9 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
     public async Task<ActionResult<DiagnosisImportResultDto>> ImportAsync(
         [FromForm] IFormFile? file, CancellationToken cancellationToken)
     {
-        if (file is null || file.Length == 0)
+        if (Request.Form.Files.Count != 1 || file is null)
+            return Problem(statusCode: 400, detail: "Передайте ровно один CSV-файл в поле file.");
+        if (file.Length == 0)
             return Problem(statusCode: 400, detail: "Выберите непустой CSV-файл в поле file.");
         if (file.Length > DiagnosisImportLimits.MaxFileBytes)
             return Problem(statusCode: 413, detail: "Размер CSV-файла не должен превышать 1 МиБ.");

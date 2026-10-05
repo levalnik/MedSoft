@@ -1,3 +1,5 @@
+using System.Data;
+using System.Linq.Expressions;
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Domain.MedicalRecords;
@@ -10,17 +12,33 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Repositories;
 
 public sealed class MedicalRecordRepository(HospitalDbContext db) : IMedicalRecordRepository, IMedicalRecordPresence
 {
-    // Один SQL-запрос даёт согласованный снимок состояния, версии и истории.
+    // Коллекции читаются отдельно, чтобы число строк не росло как diagnoses × prescriptions × events.
     private IQueryable<MedicalRecordDbo> AggregateQuery(bool tracking) =>
         (tracking ? db.MedicalRecords : db.MedicalRecords.AsNoTracking())
         .Include(x => x.Diagnoses).Include(x => x.Prescriptions).Include(x => x.HistoryEvents)
-        .AsSingleQuery();
+        .AsSplitQuery();
 
-    public async Task<MedicalRecord?> FindAsync(Guid id, bool tracking, CancellationToken cancellationToken) =>
-        (await AggregateQuery(tracking).SingleOrDefaultAsync(x => x.Id == id, cancellationToken))?.ToDomain();
+    public Task<MedicalRecord?> FindAsync(Guid id, bool tracking, CancellationToken cancellationToken) =>
+        ReadAsync(x => x.Id == id, tracking, cancellationToken);
 
-    public async Task<MedicalRecord?> FindByPatientAsync(Guid patientId, CancellationToken cancellationToken) =>
-        (await AggregateQuery(false).SingleOrDefaultAsync(x => x.PatientId == patientId, cancellationToken))?.ToDomain();
+    public Task<MedicalRecord?> FindByPatientAsync(Guid patientId, CancellationToken cancellationToken) =>
+        ReadAsync(x => x.PatientId == patientId, tracking: false, cancellationToken);
+
+    private async Task<MedicalRecord?> ReadAsync(
+        Expression<Func<MedicalRecordDbo, bool>> predicate, bool tracking, CancellationToken cancellationToken)
+    {
+        var query = AggregateQuery(tracking);
+        // При внешней транзакции с неизвестной изоляцией один SQL сохраняет согласованность.
+        if (db.Database.CurrentTransaction is not null)
+            return (await query.AsSingleQuery().SingleOrDefaultAsync(predicate, cancellationToken))?.ToDomain();
+
+        // PostgreSQL REPEATABLE READ фиксирует общий снимок для заголовка и всех трёх коллекций.
+        // Транзакция заканчивается после чтения; запись по-прежнему проверяет исходную Version.
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
+        var row = await query.SingleOrDefaultAsync(predicate, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return row?.ToDomain();
+    }
 
     public void Add(MedicalRecord record) => db.MedicalRecords.Add(record.ToDbo());
 

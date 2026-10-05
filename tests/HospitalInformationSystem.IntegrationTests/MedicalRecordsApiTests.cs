@@ -229,6 +229,39 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
+    public async Task Aggregate_read_avoids_collection_cross_product_and_keeps_one_database_snapshot()
+    {
+        var worker = await CreateWorker();
+        var record = await CreateRecord(await CreatePatient(), worker);
+        await AddDiagnosis(record.Id, await CreateDiagnosis(), worker);
+        var original = await AddPrescription(record.Id, "Исходное назначение", worker);
+        using var observation = factory.ReadProbe.Arm(record.Id);
+
+        var read = Current(record.Id);
+        await observation.HeaderRead.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        try
+        {
+            // Коммит между чтением версии и коллекций не должен попадать в исходный снимок.
+            await AddPrescription(record.Id, "Параллельное назначение", worker);
+        }
+        finally
+        {
+            observation.Resume.TrySetResult();
+        }
+        var observed = await read;
+
+        observed.Version.Should().Be(3);
+        observed.Diagnoses.Should().ContainSingle();
+        observed.Prescriptions.Should().ContainSingle(x => x.Id == original.Id);
+        observation.Commands.Should().HaveCount(4, "заголовок и три коллекции читаются отдельно, без перемножения строк");
+        observation.Commands.Should().NotContain(sql => sql.Contains("medical_record_diagnoses", StringComparison.Ordinal)
+            && sql.Contains("prescriptions", StringComparison.Ordinal)
+            && sql.Contains("medical_record_history_events", StringComparison.Ordinal));
+        (await Current(record.Id)).Version.Should().Be(4);
+        (await History(record.Id)).Should().HaveCount(4);
+    }
+
+    [Fact]
     public async Task Commands_reading_same_version_cannot_both_commit()
     {
         var worker = await CreateWorker();

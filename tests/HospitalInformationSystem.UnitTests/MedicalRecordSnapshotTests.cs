@@ -158,6 +158,24 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
+    public void Missing_tail_of_history_is_rejected_instead_of_returning_an_outdated_snapshot()
+    {
+        var (record, _, _, _) = Scenario();
+        var snapshot = () => MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.SkipLast(1), T4);
+
+        snapshot.Should().Throw<InvalidOperationException>().WithMessage("*верси*карты*");
+    }
+
+    [Fact]
+    public void Historical_snapshot_also_rejects_a_gap_in_later_history()
+    {
+        var (record, _, _, _) = Scenario();
+        var snapshot = () => MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.Where(x => x.Version != 5), T1);
+
+        snapshot.Should().Throw<InvalidOperationException>().WithMessage("*последовательность версий*");
+    }
+
+    [Fact]
     public async Task Builder_returns_not_found_for_missing_record()
     {
         var repository = new Mock<IMedicalRecordRepository>();

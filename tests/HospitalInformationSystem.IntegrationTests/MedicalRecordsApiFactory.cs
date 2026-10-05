@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Threading;
@@ -26,6 +27,7 @@ public sealed class MedicalRecordsApiFactory : WebApplicationFactory<Program>, I
 
     public TestTimeProvider Clock { get; } = new();
     public ConcurrentRecordReadGate RecordReads { get; } = new();
+    public MedicalRecordReadProbe ReadProbe { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -37,7 +39,7 @@ public sealed class MedicalRecordsApiFactory : WebApplicationFactory<Program>, I
         {
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
-            services.AddDbContext<HospitalDbContext>(options => options.AddInterceptors(RecordReads));
+            services.AddDbContext<HospitalDbContext>(options => options.AddInterceptors(RecordReads, ReadProbe));
         });
     }
 
@@ -47,6 +49,51 @@ public sealed class MedicalRecordsApiFactory : WebApplicationFactory<Program>, I
     {
         await base.DisposeAsync();
         await _postgres.DisposeAsync();
+    }
+}
+
+// Останавливает чтение после SQL заголовка карты и наблюдает только этот DbContext.
+// Параллельный HTTP-запрос может изменить карту до загрузки её дочерних коллекций.
+public sealed class MedicalRecordReadProbe : DbCommandInterceptor
+{
+    private ReadObservation? _observation;
+
+    public ReadObservation Arm(Guid recordId) => _observation = new ReadObservation(recordId);
+
+    public override async ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command,
+        CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+    {
+        var observation = _observation;
+        if (observation is null || !command.CommandText.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) ||
+            !command.CommandText.Contains("medical_records", StringComparison.Ordinal) ||
+            !command.Parameters.Cast<DbParameter>().Any(parameter => parameter.Value is Guid id && id == observation.RecordId))
+            return result;
+
+        var contextId = eventData.Context!.ContextId.InstanceId;
+        bool first;
+        lock (observation.Commands)
+        {
+            observation.ContextId ??= contextId;
+            if (observation.ContextId != contextId) return result;
+            observation.Commands.Add(command.CommandText);
+            first = observation.Commands.Count == 1;
+        }
+        if (first)
+        {
+            observation.HeaderRead.TrySetResult();
+            await observation.Resume.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+        }
+        return result;
+    }
+
+    public sealed class ReadObservation(Guid recordId) : IDisposable
+    {
+        public Guid RecordId { get; } = recordId;
+        public Guid? ContextId { get; set; }
+        public List<string> Commands { get; } = [];
+        public TaskCompletionSource HeaderRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Resume { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Dispose() => Resume.TrySetResult();
     }
 }
 

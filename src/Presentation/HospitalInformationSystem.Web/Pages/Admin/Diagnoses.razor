@@ -17,7 +17,7 @@
       При ошибке весь импорт отменяется.</p>
     <div class="import-controls">
       <div><label for="diagnosis-csv">CSV-файл</label><InputFile id="diagnosis-csv" class="form-control" accept=".csv,text/csv" OnChange="SelectFile" disabled="@_importing" aria-describedby="csv-help" /></div>
-      <button class="btn btn-primary" disabled="@(_file is null || _importing)" @onclick="ImportAsync">@(_importing ? "Импортируем…" : "Импортировать")</button>
+      <button class="btn btn-primary" disabled="@(_file is null || _importing || _loading)" @onclick="ImportAsync">@(_importing ? "Импортируем…" : "Импортировать")</button>
       <a href="examples/diagnoses.csv" download="diagnoses.csv">Скачать пример</a>
     </div>
     <ErrorAlert Message="@_importError" />
@@ -86,7 +86,7 @@
 
     private async Task ImportAsync()
     {
-        if (_file is null || _importing) return;
+        if (_file is null || _importing || _loading) return;
         _importing = true;
         _importError = null;
         _result = null;
