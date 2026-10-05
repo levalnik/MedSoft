@@ -13,7 +13,7 @@ public static class PrescriptionFactory
             ReplacesPrescriptionId = replacesPrescriptionId
         };
 
-    internal static string NormalizeText(string? text)
+    private static string NormalizeText(string? text)
     {
         var value = text?.Trim();
         TextValidation.RejectNullCharacter(value, "Назначение");

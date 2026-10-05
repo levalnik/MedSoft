@@ -8,8 +8,10 @@ using MediatR;
 namespace HospitalInformationSystem.Application.MedicalRecords.Commands.CreateMedicalRecord;
 
 public sealed class CreateMedicalRecordCommandHandler(
-    MedicalRecordCommandContext context, IPatientRepository patients, IMedicalRecordPresence presence)
-    : IRequestHandler<CreateMedicalRecordCommand, MedicalRecordDto>
+    MedicalRecordCommandContext context,
+    IPatientRepository patients,
+    IMedicalRecordPresence presence
+) : IRequestHandler<CreateMedicalRecordCommand, MedicalRecordDto>
 {
     public async Task<MedicalRecordDto> Handle(CreateMedicalRecordCommand request, CancellationToken cancellationToken)
     {
@@ -20,6 +22,6 @@ public sealed class CreateMedicalRecordCommandHandler(
             throw new BusinessConflictException("У пациента уже есть ЭМК.");
         var record = MedicalRecordFactory.Create(request.PatientId, author, context.Now);
         await context.SaveNewAsync(record, cancellationToken);
-        return record.ToDto();
+        return Mapping.MedicalRecordMapping.ToDto(record);
     }
 }

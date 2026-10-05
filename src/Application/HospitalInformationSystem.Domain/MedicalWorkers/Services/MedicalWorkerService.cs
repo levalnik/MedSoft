@@ -4,7 +4,8 @@ namespace HospitalInformationSystem.Domain.MedicalWorkers.Services;
 
 public static class MedicalWorkerService
 {
-    public static void Update(MedicalWorker worker, string firstName, string lastName, string position, DateTimeOffset now)
+    public static void Update(MedicalWorker worker, string firstName, string lastName, string position,
+        DateTimeOffset now)
     {
         var validFirstName = Validate(firstName, "Имя");
         var validLastName = Validate(lastName, "Фамилия");

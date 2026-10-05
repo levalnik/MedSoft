@@ -30,7 +30,7 @@ public sealed class MedicalWorkerRepository(HospitalDbContext db) : IMedicalWork
     public async Task UpdateAsync(MedicalWorker worker, CancellationToken cancellationToken)
     {
         var row = await db.MedicalWorkers.FindAsync([worker.Id], cancellationToken)
-            ?? throw new EntityNotFoundException("Медработник не найден.");
+                  ?? throw new EntityNotFoundException("Медработник не найден.");
         worker.UpdateDbo(row);
     }
 }

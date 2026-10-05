@@ -61,4 +61,3 @@ public sealed class PatientTests
         act.Should().Throw<DomainValidationException>();
     }
 }
-

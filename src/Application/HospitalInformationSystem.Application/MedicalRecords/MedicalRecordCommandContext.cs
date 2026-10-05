@@ -7,8 +7,10 @@ using HospitalInformationSystem.Domain.MedicalWorkers;
 namespace HospitalInformationSystem.Application.MedicalRecords;
 
 public sealed class MedicalRecordCommandContext(
-    IMedicalRecordRepository records, IMedicalWorkerRepository workers,
-    IUnitOfWork unitOfWork, TimeProvider timeProvider)
+    IMedicalRecordRepository records,
+    IMedicalWorkerRepository workers,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
 {
     public DateTimeOffset Now => timeProvider.GetUtcNow();
 

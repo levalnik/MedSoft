@@ -8,10 +8,11 @@ namespace HospitalInformationSystem.Application.MedicalRecords.Queries.GetPatien
 public sealed class GetPatientMedicalRecordQueryHandler(IMedicalRecordRepository repository)
     : IRequestHandler<GetPatientMedicalRecordQuery, MedicalRecordDto>
 {
-    public async Task<MedicalRecordDto> Handle(GetPatientMedicalRecordQuery request, CancellationToken cancellationToken)
+    public async Task<MedicalRecordDto> Handle(GetPatientMedicalRecordQuery request,
+        CancellationToken cancellationToken)
     {
         var record = await repository.FindByPatientAsync(request.PatientId, cancellationToken)
-            ?? throw new EntityNotFoundException("ЭМК пациента не найдена.");
-        return record.ToDto();
+                     ?? throw new EntityNotFoundException("ЭМК пациента не найдена.");
+        return Mapping.MedicalRecordMapping.ToDto(record);
     }
 }

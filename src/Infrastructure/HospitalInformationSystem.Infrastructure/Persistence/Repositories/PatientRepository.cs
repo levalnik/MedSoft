@@ -30,15 +30,14 @@ public sealed class PatientRepository(HospitalDbContext db) : IPatientRepository
     public async Task UpdateAsync(Patient entity, CancellationToken cancellationToken)
     {
         var row = await db.Set<PatientDbo>().FindAsync([entity.Id], cancellationToken)
-            ?? throw new EntityNotFoundException("Пациент не найден.");
+                  ?? throw new EntityNotFoundException("Пациент не найден.");
         entity.UpdateDbo(row);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         var row = await db.Set<PatientDbo>().FindAsync([id], cancellationToken)
-            ?? throw new EntityNotFoundException("Пациент не найден.");
+                  ?? throw new EntityNotFoundException("Пациент не найден.");
         db.Set<PatientDbo>().Remove(row);
     }
 }
-

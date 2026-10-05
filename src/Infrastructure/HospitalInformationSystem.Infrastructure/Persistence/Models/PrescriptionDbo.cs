@@ -11,4 +11,3 @@ public sealed class PrescriptionDbo
     public Guid? CancelledByMedicalWorkerId { get; set; }
     public Guid? ReplacesPrescriptionId { get; set; }
 }
-

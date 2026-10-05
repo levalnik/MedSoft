@@ -39,7 +39,9 @@ public static class MedicalRecordSnapshotReplay
                 case MedicalRecordEventType.MedicalRecordCreated:
                 {
                     var payload = Read<MedicalRecordCreatedPayload>(item);
-                    Require(version == 0 && payload.PatientId == record.PatientId && item.OccurredAtUtc == record.CreatedAtUtc,
+                    Require(
+                        version == 0 && payload.PatientId == record.PatientId &&
+                        item.OccurredAtUtc == record.CreatedAtUtc,
                         "некорректное событие создания карты");
                     RequireEntityId(item, record.Id);
                     break;
@@ -49,10 +51,13 @@ public static class MedicalRecordSnapshotReplay
                     var payload = Read<DiagnosisAddedPayload>(item);
                     RequireEntityId(item, payload.MedicalRecordDiagnosisId);
                     Require(payload.DiagnosisDefinitionId != Guid.Empty && !string.IsNullOrWhiteSpace(payload.Code)
-                        && !string.IsNullOrWhiteSpace(payload.Name), "неполные данные добавленного диагноза");
-                    Require(diagnosisIds.Add(payload.MedicalRecordDiagnosisId), "повторное добавление той же записи диагноза");
+                                                                        && !string.IsNullOrWhiteSpace(payload.Name),
+                        "неполные данные добавленного диагноза");
+                    Require(diagnosisIds.Add(payload.MedicalRecordDiagnosisId),
+                        "повторное добавление той же записи диагноза");
                     diagnoses.Add(payload.MedicalRecordDiagnosisId, new MedicalRecordDiagnosisDto(
-                        payload.MedicalRecordDiagnosisId, payload.Code, payload.Name, item.OccurredAtUtc, item.PerformedByMedicalWorkerId));
+                        payload.MedicalRecordDiagnosisId, payload.Code, payload.Name, item.OccurredAtUtc,
+                        item.PerformedByMedicalWorkerId));
                     break;
                 }
                 case MedicalRecordEventType.DiagnosisRemoved:
@@ -61,7 +66,8 @@ public static class MedicalRecordSnapshotReplay
                     RequireEntityId(item, payload.MedicalRecordDiagnosisId);
                     Require(diagnoses.TryGetValue(payload.MedicalRecordDiagnosisId, out var diagnosis),
                         "удаление отсутствующего диагноза");
-                    Require(diagnosis!.Code == payload.Code && diagnosis.Name == payload.Name, "изменён исторический диагноз");
+                    Require(diagnosis!.Code == payload.Code && diagnosis.Name == payload.Name,
+                        "изменён исторический диагноз");
                     diagnoses.Remove(payload.MedicalRecordDiagnosisId);
                     break;
                 }
@@ -71,7 +77,9 @@ public static class MedicalRecordSnapshotReplay
                     RequireEntityId(item, payload.PrescriptionId);
                     Require(!string.IsNullOrWhiteSpace(payload.Text), "отсутствует текст назначения");
                     Require(prescriptionIds.Add(payload.PrescriptionId), "повторное добавление того же назначения");
-                    Require(payload.ReplacesPrescriptionId is null || cancelledPrescriptionIds.Contains(payload.ReplacesPrescriptionId.Value),
+                    Require(
+                        payload.ReplacesPrescriptionId is null ||
+                        cancelledPrescriptionIds.Contains(payload.ReplacesPrescriptionId.Value),
                         "заменяемое назначение не было отменено");
                     prescriptions.Add(payload.PrescriptionId, new PrescriptionDto(payload.PrescriptionId, payload.Text,
                         item.OccurredAtUtc, item.PerformedByMedicalWorkerId, payload.ReplacesPrescriptionId));
@@ -114,6 +122,7 @@ public static class MedicalRecordSnapshotReplay
             version = item.Version;
             previousTime = item.OccurredAtUtc;
         }
+
         Require(version == record.Version, "последняя версия истории не совпадает с версией карты");
     }
 
@@ -122,11 +131,12 @@ public static class MedicalRecordSnapshotReplay
         try
         {
             return JsonSerializer.Deserialize<T>(item.PayloadJson, PayloadOptions)
-                ?? throw Corrupted($"пустой payload события версии {item.Version}");
+                   ?? throw Corrupted($"пустой payload события версии {item.Version}");
         }
         catch (JsonException exception)
         {
-            throw new InvalidOperationException($"История медицинской карты повреждена: неверный JSON версии {item.Version}.", exception);
+            throw new InvalidOperationException(
+                $"История медицинской карты повреждена: неверный JSON версии {item.Version}.", exception);
         }
     }
 

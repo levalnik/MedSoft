@@ -19,7 +19,8 @@ public sealed class DiagnosisCsvImportTests
     [Fact]
     public void Parser_handles_bom_crlf_commas_escaped_quotes_and_multiline_fields()
     {
-        var rows = DiagnosisCsvParser.Parse("\uFEFFCode,Name\r\n A00.00 , \"Боль, \"\"острая\"\"\"\r\nB00.00,\"Первая\r\nвторая\"\r\n");
+        var rows = DiagnosisCsvParser.Parse(
+            "\uFEFFCode,Name\r\n A00.00 , \"Боль, \"\"острая\"\"\"\r\nB00.00,\"Первая\r\nвторая\"\r\n");
         rows.Should().HaveCount(2);
         rows[0].Should().Be(new DiagnosisCsvRow(2, "A00.00", "Боль, \"острая\""));
         rows[1].Name.Should().Be("Первая\r\nвторая");
@@ -70,7 +71,8 @@ public sealed class DiagnosisCsvImportTests
         var action = () => handler.Handle(new ImportDiagnosesCommand("Code,Name\n" + data), default);
 
         var error = await action.Should().ThrowAsync<ValidationException>();
-        error.Which.Errors.Should().Contain(x => x.ErrorMessage.Contains(expected) && x.ErrorMessage.Contains("Строка 3"));
+        error.Which.Errors.Should()
+            .Contain(x => x.ErrorMessage.Contains(expected) && x.ErrorMessage.Contains("Строка 3"));
         repository.VerifyNoOtherCalls();
         unitOfWork.VerifyNoOtherCalls();
     }
@@ -87,7 +89,8 @@ public sealed class DiagnosisCsvImportTests
         var unitOfWork = new Mock<IUnitOfWork>(MockBehavior.Strict);
         var handler = new ImportDiagnosesCommandHandler(repository.Object, unitOfWork.Object, TimeProvider.System);
 
-        var result = await handler.Handle(new ImportDiagnosesCommand($"Code,Name\n{diagnosis.Code},{diagnosis.Name}"), default);
+        var result = await handler.Handle(new ImportDiagnosesCommand($"Code,Name\n{diagnosis.Code},{diagnosis.Name}"),
+            default);
 
         result.Should().Be(new DiagnosisImportResultDto(0, 0, 1));
         repository.VerifyAll();

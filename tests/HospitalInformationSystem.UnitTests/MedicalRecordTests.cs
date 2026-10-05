@@ -6,10 +6,12 @@ using System;
 using System.Linq;
 using FluentAssertions;
 using HospitalInformationSystem.Application.MedicalRecords;
+using HospitalInformationSystem.Application.MedicalRecords.Mapping;
 using HospitalInformationSystem.Domain.Common;
 using HospitalInformationSystem.Domain.MedicalRecords;
 using HospitalInformationSystem.Domain.MedicalWorkers;
 using Xunit;
+using MedicalRecordMapping = HospitalInformationSystem.Application.MedicalRecords.Mapping.MedicalRecordMapping;
 
 namespace HospitalInformationSystem.UnitTests;
 
@@ -50,7 +52,8 @@ public sealed class MedicalRecordTests
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
         var original = MedicalRecordService.AddPrescription(record, "Исходное назначение", author, Now.AddMinutes(1));
         var replacedAt = Now.AddMinutes(2);
-        var replacement = MedicalRecordService.ReplacePrescription(record, original.Id, " Новое назначение ", author, replacedAt);
+        var replacement =
+            MedicalRecordService.ReplacePrescription(record, original.Id, " Новое назначение ", author, replacedAt);
 
         original.Text.Should().Be("Исходное назначение");
         original.CancelledAtUtc.Should().Be(replacedAt);
@@ -78,7 +81,8 @@ public sealed class MedicalRecordTests
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
         var original = MedicalRecordService.AddPrescription(record, "Назначение", author, Now.AddMinutes(1));
 
-        var replace = () => MedicalRecordService.ReplacePrescription(record, original.Id, text!, author, Now.AddMinutes(2));
+        var replace = () =>
+            MedicalRecordService.ReplacePrescription(record, original.Id, text!, author, Now.AddMinutes(2));
 
         replace.Should().Throw<DomainValidationException>();
         original.CancelledAtUtc.Should().BeNull();
@@ -95,7 +99,8 @@ public sealed class MedicalRecordTests
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
         MedicalRecordService.AddPrescription(record, new string('а', 3), author, Now);
         var longPrescription = MedicalRecordService.AddPrescription(record, new string('а', 128), author, Now);
-        var replace = () => MedicalRecordService.ReplacePrescription(record, longPrescription.Id, new string('а', 129), author, Now);
+        var replace = () =>
+            MedicalRecordService.ReplacePrescription(record, longPrescription.Id, new string('а', 129), author, Now);
         replace.Should().Throw<DomainValidationException>();
         longPrescription.CancelledAtUtc.Should().BeNull();
         record.Version.Should().Be(3);
@@ -108,8 +113,11 @@ public sealed class MedicalRecordTests
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
         var prescription = MedicalRecordService.AddPrescription(record, "Назначение", author, Now);
         MedicalRecordService.CancelPrescription(record, prescription.Id, author, Now.AddMinutes(1));
-        Action cancelAgain = () => MedicalRecordService.CancelPrescription(record, prescription.Id, author, Now.AddMinutes(2));
-        var replace = () => MedicalRecordService.ReplacePrescription(record, prescription.Id, "Новое назначение", author, Now.AddMinutes(2));
+        Action cancelAgain = () =>
+            MedicalRecordService.CancelPrescription(record, prescription.Id, author, Now.AddMinutes(2));
+        var replace = () =>
+            MedicalRecordService.ReplacePrescription(record, prescription.Id, "Новое назначение", author,
+                Now.AddMinutes(2));
 
         cancelAgain.Should().Throw<BusinessRuleConflictException>();
         replace.Should().Throw<BusinessRuleConflictException>();
@@ -123,7 +131,8 @@ public sealed class MedicalRecordTests
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
         var definitionId = Guid.NewGuid();
-        var diagnosis = MedicalRecordService.AddDiagnosis(record, definitionId, " I10.00 ", " Гипертензия ", author, Now.AddMinutes(1));
+        var diagnosis = MedicalRecordService.AddDiagnosis(record, definitionId, " I10.00 ", " Гипертензия ", author,
+            Now.AddMinutes(1));
         MedicalRecordService.RemoveDiagnosis(record, diagnosis.Id, author, Now.AddMinutes(2));
 
         diagnosis.DiagnosisDefinitionId.Should().Be(definitionId);
@@ -132,7 +141,8 @@ public sealed class MedicalRecordTests
         diagnosis.AddedAtUtc.Should().Be(Now.AddMinutes(1));
         diagnosis.RemovedAtUtc.Should().Be(Now.AddMinutes(2));
         diagnosis.RemovedByMedicalWorkerId.Should().Be(author.Id);
-        Action removeAgain = () => MedicalRecordService.RemoveDiagnosis(record, diagnosis.Id, author, Now.AddMinutes(3));
+        Action removeAgain = () =>
+            MedicalRecordService.RemoveDiagnosis(record, diagnosis.Id, author, Now.AddMinutes(3));
         removeAgain.Should().Throw<BusinessRuleConflictException>();
         record.Version.Should().Be(3);
         record.Diagnoses.Should().ContainSingle();
@@ -222,16 +232,18 @@ public sealed class MedicalRecordTests
         var active = MedicalRecordService.AddDiagnosis(record, Guid.NewGuid(), "E11.90", "Диабет", author, Now);
         MedicalRecordService.RemoveDiagnosis(record, removed.Id, author, Now);
         var cancelled = MedicalRecordService.AddPrescription(record, "Исходное назначение", author, Now);
-        var replacement = MedicalRecordService.ReplacePrescription(record, cancelled.Id, "Новое назначение", author, Now);
+        var replacement =
+            MedicalRecordService.ReplacePrescription(record, cancelled.Id, "Новое назначение", author, Now);
 
-        var dto = record.ToDto();
+        var dto = MedicalRecordMapping.ToDto(record);
 
         dto.Version.Should().Be(record.Version);
         dto.Diagnoses.Should().ContainSingle(x => x.Id == active.Id && x.Code == "E11.90");
-        dto.Prescriptions.Should().ContainSingle(x => x.Id == replacement.Id && x.ReplacesPrescriptionId == cancelled.Id);
+        dto.Prescriptions.Should()
+            .ContainSingle(x => x.Id == replacement.Id && x.ReplacesPrescriptionId == cancelled.Id);
         record.Diagnoses.Should().HaveCount(2);
         record.Prescriptions.Should().HaveCount(2);
-        var historyDto = record.HistoryEvents.First().ToDto();
+        var historyDto = MedicalRecordMapping.ToDto(record.HistoryEvents.First());
         historyDto.EventType.Should().Be("MedicalRecordCreated");
         historyDto.PerformedByName.Should().Be("Иванов Алексей");
     }

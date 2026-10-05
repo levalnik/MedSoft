@@ -12,7 +12,7 @@ public sealed class GetDiagnosisQueryHandler(IDiagnosisRepository repository)
     {
         var diagnosis = await repository.FindAsync(request.Id, tracking: false, cancellationToken)
             ?? throw new EntityNotFoundException("Диагноз не найден.");
-        return diagnosis.ToDto();
+        return Mapping.DiagnosisMapping.ToDto(diagnosis);
     }
 }
 

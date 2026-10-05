@@ -7,6 +7,8 @@ namespace HospitalInformationSystem.Application.MedicalWorkers.Queries.GetMedica
 public sealed class GetMedicalWorkersQueryHandler(IMedicalWorkerRepository repository)
     : IRequestHandler<GetMedicalWorkersQuery, IReadOnlyList<MedicalWorkerDto>>
 {
-    public async Task<IReadOnlyList<MedicalWorkerDto>> Handle(GetMedicalWorkersQuery request, CancellationToken cancellationToken) =>
-        (await repository.ListAsync(request.IncludeDeleted, cancellationToken)).Select(x => x.ToDto()).ToArray();
+    public async Task<IReadOnlyList<MedicalWorkerDto>> Handle(GetMedicalWorkersQuery request,
+        CancellationToken cancellationToken) =>
+        (await repository.ListAsync(request.IncludeDeleted, cancellationToken))
+        .Select(Mapping.MedicalWorkerMapping.ToDto).ToArray();
 }

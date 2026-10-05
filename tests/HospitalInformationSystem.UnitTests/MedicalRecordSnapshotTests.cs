@@ -24,7 +24,8 @@ public sealed class MedicalRecordSnapshotTests
     private static readonly DateTimeOffset T3 = T0.AddMinutes(3);
     private static readonly DateTimeOffset T4 = T0.AddMinutes(4);
 
-    private static (MedicalRecord Record, MedicalRecordDiagnosis Diagnosis, Prescription Original, Prescription Replacement) Scenario()
+    private static (MedicalRecord Record, MedicalRecordDiagnosis Diagnosis, Prescription Original, Prescription
+        Replacement) Scenario()
     {
         var author = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", T0);
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, T0);
@@ -47,7 +48,8 @@ public sealed class MedicalRecordSnapshotTests
 
         var diagnosed = MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents, T1);
         diagnosed.Version.Should().Be(2);
-        diagnosed.Diagnoses.Should().ContainSingle(x => x.Id == diagnosis.Id && x.Code == "I10.00" && x.Name == "Гипертензия");
+        diagnosed.Diagnoses.Should()
+            .ContainSingle(x => x.Id == diagnosis.Id && x.Code == "I10.00" && x.Name == "Гипертензия");
         diagnosed.Prescriptions.Should().BeEmpty();
 
         var prescribed = MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents, T2);
@@ -118,16 +120,21 @@ public sealed class MedicalRecordSnapshotTests
         var snapshot = MedicalRecordSnapshotReplay.Build(withoutCurrentState, withoutCurrentState.HistoryEvents, T2);
 
         snapshot.Diagnoses.Should().ContainSingle(x => x.Id == diagnosis.Id && x.Name == "Гипертензия"
-            && x.AddedByMedicalWorkerId == diagnosis.AddedByMedicalWorkerId && x.AddedAtUtc == T1);
+                                                                            && x.AddedByMedicalWorkerId ==
+                                                                            diagnosis.AddedByMedicalWorkerId &&
+                                                                            x.AddedAtUtc == T1);
         snapshot.Prescriptions.Should().ContainSingle(x => x.Id == original.Id && x.Text == "Исходное назначение"
-            && x.CreatedByMedicalWorkerId == original.CreatedByMedicalWorkerId && x.CreatedAtUtc == T2);
+                                                                               && x.CreatedByMedicalWorkerId ==
+                                                                               original.CreatedByMedicalWorkerId &&
+                                                                               x.CreatedAtUtc == T2);
     }
 
     [Fact]
     public void Missing_versions_and_unknown_event_types_are_rejected()
     {
         var (record, _, _, _) = Scenario();
-        var missingVersion = () => MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.Where(x => x.Version != 2), T4);
+        var missingVersion = () =>
+            MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.Where(x => x.Version != 2), T4);
         missingVersion.Should().Throw<InvalidOperationException>().WithMessage("*последовательность версий*");
 
         var unknown = ReplaceEvent(record.HistoryEvents.ElementAt(1), type: (MedicalRecordEventType)999);
@@ -169,7 +176,8 @@ public sealed class MedicalRecordSnapshotTests
     public void Historical_snapshot_also_rejects_a_gap_in_later_history()
     {
         var (record, _, _, _) = Scenario();
-        var snapshot = () => MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.Where(x => x.Version != 5), T1);
+        var snapshot = () =>
+            MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.Where(x => x.Version != 5), T1);
 
         snapshot.Should().Throw<InvalidOperationException>().WithMessage("*последовательность версий*");
     }
@@ -202,12 +210,14 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     private static MedicalRecordHistoryEvent ReplaceEvent(
-        MedicalRecordHistoryEvent item, MedicalRecordEventType? type = null, string? payload = null, Guid? recordId = null) =>
+        MedicalRecordHistoryEvent item, MedicalRecordEventType? type = null, string? payload = null,
+        Guid? recordId = null) =>
         new()
         {
             Id = item.Id, MedicalRecordId = recordId ?? item.MedicalRecordId, Version = item.Version,
             OccurredAtUtc = item.OccurredAtUtc, PerformedByMedicalWorkerId = item.PerformedByMedicalWorkerId,
-            PerformedByNameSnapshot = item.PerformedByNameSnapshot, PerformedByPositionSnapshot = item.PerformedByPositionSnapshot,
+            PerformedByNameSnapshot = item.PerformedByNameSnapshot,
+            PerformedByPositionSnapshot = item.PerformedByPositionSnapshot,
             EventType = type ?? item.EventType, EntityId = item.EntityId, PayloadJson = payload ?? item.PayloadJson
         };
 }

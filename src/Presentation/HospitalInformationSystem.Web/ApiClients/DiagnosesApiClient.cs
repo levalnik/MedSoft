@@ -10,7 +10,8 @@ public sealed class DiagnosesApiClient(HttpClient http)
         return await ApiResponseReader.ReadListAsync<DiagnosisDefinitionDto>(response, cancellationToken);
     }
 
-    public async Task<DiagnosisImportResultDto> ImportAsync(Stream file, string fileName, CancellationToken cancellationToken = default)
+    public async Task<DiagnosisImportResultDto> ImportAsync(Stream file, string fileName,
+        CancellationToken cancellationToken = default)
     {
         using var content = new MultipartFormDataContent();
         content.Add(new StreamContent(file), "file", fileName);

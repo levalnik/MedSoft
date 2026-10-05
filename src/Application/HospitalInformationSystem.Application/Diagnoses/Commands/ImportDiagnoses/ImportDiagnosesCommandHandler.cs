@@ -13,10 +13,13 @@ using MediatR;
 namespace HospitalInformationSystem.Application.Diagnoses.Commands.ImportDiagnoses;
 
 public sealed class ImportDiagnosesCommandHandler(
-    IDiagnosisRepository repository, IUnitOfWork unitOfWork, TimeProvider timeProvider)
-    : IRequestHandler<ImportDiagnosesCommand, DiagnosisImportResultDto>
+    IDiagnosisRepository repository,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider
+) : IRequestHandler<ImportDiagnosesCommand, DiagnosisImportResultDto>
 {
-    public async Task<DiagnosisImportResultDto> Handle(ImportDiagnosesCommand request, CancellationToken cancellationToken)
+    public async Task<DiagnosisImportResultDto> Handle(ImportDiagnosesCommand request,
+        CancellationToken cancellationToken)
     {
         var rows = DiagnosisCsvParser.Parse(request.Csv, cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -31,12 +34,16 @@ public sealed class ImportDiagnosesCommandHandler(
                 errors.Add(new($"file[{row.Line}].Code", $"Строка {row.Line}: повтор кода {row.Code}."));
             if (!names.Add(row.Name))
                 errors.Add(new($"file[{row.Line}].Name", $"Строка {row.Line}: повтор названия {row.Name}."));
-            try { candidates.Add((row, DiagnosisDefinitionFactory.Create(row.Code, row.Name, now))); }
+            try
+            {
+                candidates.Add((row, DiagnosisDefinitionFactory.Create(row.Code, row.Name, now)));
+            }
             catch (DomainValidationException e)
             {
                 errors.Add(new($"file[{row.Line}]", $"Строка {row.Line}: {e.Message}"));
             }
         }
+
         if (errors.Count > 0) throw new ValidationException(errors);
 
         var existing = await repository.FindImportMatchesAsync(codes, names, cancellationToken);
@@ -66,6 +73,7 @@ public sealed class ImportDiagnosesCommandHandler(
                 updated++;
             }
         }
+
         if (created + updated > 0)
             await unitOfWork.SaveChangesAsync(cancellationToken);
         return new DiagnosisImportResultDto(created, updated, unchanged);

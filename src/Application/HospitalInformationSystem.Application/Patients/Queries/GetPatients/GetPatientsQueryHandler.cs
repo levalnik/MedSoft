@@ -12,10 +12,9 @@ public sealed class GetPatientsQueryHandler(IPatientRepository repository, IMedi
         var patients = await repository.ListAsync(cancellationToken);
         var idsWithRecords = await recordPresence.GetPatientIdsWithRecordsAsync(
             patients.Select(x => x.Id).ToArray(), cancellationToken);
-        return patients.Select(patient => patient.ToDto() with
+        return patients.Select(patient => Mapping.PatientMapping.ToDto(patient) with
         {
             HasMedicalRecord = idsWithRecords.Contains(patient.Id)
         }).ToArray();
     }
 }
-

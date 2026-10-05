@@ -23,23 +23,28 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
     [Fact]
     public async Task Create_update_delete_preserves_row_and_filters_default_list()
     {
-        var create = await _client.PostAsJsonAsync("/api/medical-workers", new SaveMedicalWorkerRequest(" Алексей ", "Орлов", "Врач"));
+        var create = await _client.PostAsJsonAsync("/api/medical-workers",
+            new SaveMedicalWorkerRequest(" Алексей ", "Орлов", "Врач"));
         create.StatusCode.Should().Be(HttpStatusCode.Created);
         var worker = (await create.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
         create.Headers.Location!.ToString().Should().EndWith($"/api/medical-workers/{worker.Id}");
         worker.FirstName.Should().Be("Алексей");
 
-        var update = await _client.PutAsJsonAsync($"/api/medical-workers/{worker.Id}", new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач-хирург"));
+        var update = await _client.PutAsJsonAsync($"/api/medical-workers/{worker.Id}",
+            new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач-хирург"));
         update.StatusCode.Should().Be(HttpStatusCode.OK);
         (await update.Content.ReadFromJsonAsync<MedicalWorkerDto>())!.Position.Should().Be("Врач-хирург");
 
-        (await _client.DeleteAsync($"/api/medical-workers/{worker.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
-        (await _client.DeleteAsync($"/api/medical-workers/{worker.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await _client.DeleteAsync($"/api/medical-workers/{worker.Id}")).StatusCode.Should()
+            .Be(HttpStatusCode.NoContent);
+        (await _client.DeleteAsync($"/api/medical-workers/{worker.Id}")).StatusCode.Should()
+            .Be(HttpStatusCode.NoContent);
         var active = await _client.GetFromJsonAsync<MedicalWorkerDto[]>("/api/medical-workers");
         active.Should().NotContain(x => x.Id == worker.Id);
         var all = await _client.GetFromJsonAsync<MedicalWorkerDto[]>("/api/medical-workers?includeDeleted=true");
         all.Should().Contain(x => x.Id == worker.Id && x.IsDeleted);
-        (await _client.GetFromJsonAsync<MedicalWorkerDto>($"/api/medical-workers/{worker.Id}"))!.IsDeleted.Should().BeTrue();
+        (await _client.GetFromJsonAsync<MedicalWorkerDto>($"/api/medical-workers/{worker.Id}"))!.IsDeleted.Should()
+            .BeTrue();
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
@@ -58,7 +63,8 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
         var count = await db.MedicalWorkers.CountAsync();
-        var response = await _client.PostAsJsonAsync("/api/medical-workers", new SaveMedicalWorkerRequest(name!, "Орлов", "Врач"));
+        var response = await _client.PostAsJsonAsync("/api/medical-workers",
+            new SaveMedicalWorkerRequest(name!, "Орлов", "Врач"));
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
         (await response.Content.ReadFromJsonAsync<ValidationProblemDetails>())!.Errors.Should().ContainKey("FirstName");
@@ -72,7 +78,8 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
     public async Task Missing_worker_returns_404_problem_details(string method)
     {
         using var request = new HttpRequestMessage(new HttpMethod(method), $"/api/medical-workers/{Guid.NewGuid()}");
-        if (method == "PUT") request.Content = JsonContent.Create(new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач"));
+        if (method == "PUT")
+            request.Content = JsonContent.Create(new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач"));
         var response = await _client.SendAsync(request);
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await response.Content.ReadFromJsonAsync<ProblemDetails>())!.Status.Should().Be(404);
@@ -86,10 +93,11 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
         var id = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
         Func<Task> act = async () => await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO medical_workers (id, first_name, last_name, position, is_deleted, created_at_utc, updated_at_utc)
-            VALUES ({id}, 'А', 'Орлов', 'Врач', false, {now}, {now})
-            """);
-        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+             INSERT INTO medical_workers (id, first_name, last_name, position, is_deleted, created_at_utc, updated_at_utc)
+             VALUES ({id}, 'А', 'Орлов', 'Врач', false, {now}, {now})
+             """);
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should()
+            .Be(PostgresErrorCodes.CheckViolation);
     }
 
     [Fact]

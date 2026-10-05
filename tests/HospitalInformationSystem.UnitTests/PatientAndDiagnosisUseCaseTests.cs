@@ -93,9 +93,11 @@ public sealed class PatientAndDiagnosisUseCaseTests
         var presence = new Mock<IMedicalRecordPresence>();
         presence.Setup(x => x.ExistsForPatientAsync(patient.Id, CancellationToken.None)).ReturnsAsync(true);
         var sequence = new MockSequence();
-        repository.InSequence(sequence).Setup(x => x.UpdateAsync(patient, CancellationToken.None)).Returns(Task.CompletedTask);
+        repository.InSequence(sequence).Setup(x => x.UpdateAsync(patient, CancellationToken.None))
+            .Returns(Task.CompletedTask);
         unitOfWork.InSequence(sequence).Setup(x => x.SaveChangesAsync(CancellationToken.None)).ReturnsAsync(1);
-        var handler = new UpdatePatientCommandHandler(repository.Object, unitOfWork.Object, clock.Object, presence.Object);
+        var handler =
+            new UpdatePatientCommandHandler(repository.Object, unitOfWork.Object, clock.Object, presence.Object);
 
         var result = await handler.Handle(new UpdatePatientCommand(patient.Id, "Мария", "Петрова", null,
             patient.BirthDate, ContractSex.Unknown, "Комментарий"), CancellationToken.None);
@@ -112,7 +114,8 @@ public sealed class PatientAndDiagnosisUseCaseTests
     public async Task Duplicate_diagnosis_is_rejected_without_save()
     {
         var repository = new Mock<IDiagnosisRepository>();
-        repository.Setup(x => x.ExistsConflictAsync("A00.00", "Холера", null, CancellationToken.None)).ReturnsAsync(true);
+        repository.Setup(x => x.ExistsConflictAsync("A00.00", "Холера", null, CancellationToken.None))
+            .ReturnsAsync(true);
         var unitOfWork = new Mock<IUnitOfWork>();
         var handler = new CreateDiagnosisCommandHandler(repository.Object, unitOfWork.Object, TimeProvider.System);
 

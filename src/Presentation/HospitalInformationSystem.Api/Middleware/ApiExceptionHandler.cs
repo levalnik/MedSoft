@@ -6,10 +6,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace HospitalInformationSystem.Api.Middleware;
 
-public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsService, ILogger<ApiExceptionHandler> logger)
+public sealed class ApiExceptionHandler(
+    IProblemDetailsService problemDetailsService,
+    ILogger<ApiExceptionHandler> logger)
     : IExceptionHandler
 {
-    public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken cancellationToken)
+    public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception,
+        CancellationToken cancellationToken)
     {
         ProblemDetails problem = exception switch
         {
@@ -19,28 +22,34 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
             {
                 Status = 400, Title = "Проверьте введённые данные."
             },
-            DomainValidationException => new ProblemDetails { Status = 400, Title = "Некорректные данные.", Detail = exception.Message },
+            DomainValidationException => new ProblemDetails
+                { Status = 400, Title = "Некорректные данные.", Detail = exception.Message },
             BadHttpRequestException badRequest => new ProblemDetails
             {
                 Status = badRequest.StatusCode, Title = "Некорректный HTTP-запрос."
             },
-            EntityNotFoundException => new ProblemDetails { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
-            DomainEntityNotFoundException => new ProblemDetails { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
+            EntityNotFoundException => new ProblemDetails
+                { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
+            DomainEntityNotFoundException => new ProblemDetails
+                { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
             BusinessConflictException or BusinessRuleConflictException => new ProblemDetails
             {
                 Status = 409, Title = "Операция конфликтует с текущим состоянием данных.", Detail = exception.Message
             },
             _ => new ProblemDetails { Status = 500, Title = "Не удалось выполнить запрос." }
         };
-        if (problem.Status == 500) logger.LogError(exception, "Unexpected error processing {Path}", context.Request.Path);
+        if (problem.Status == 500)
+            logger.LogError(exception, "Unexpected error processing {Path}", context.Request.Path);
         context.Response.StatusCode = problem.Status!.Value;
         problem.Instance = context.Request.Path;
         problem.Extensions["traceId"] = context.TraceIdentifier;
-        if (!await problemDetailsService.TryWriteAsync(new ProblemDetailsContext { HttpContext = context, ProblemDetails = problem }))
+        if (!await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+                { HttpContext = context, ProblemDetails = problem }))
         {
             await context.Response.WriteAsJsonAsync((object)problem, options: null,
                 contentType: "application/problem+json", cancellationToken: cancellationToken);
         }
+
         return true;
     }
 }

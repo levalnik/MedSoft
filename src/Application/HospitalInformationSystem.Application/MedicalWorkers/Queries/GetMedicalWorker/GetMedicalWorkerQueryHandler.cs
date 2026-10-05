@@ -12,6 +12,6 @@ public sealed class GetMedicalWorkerQueryHandler(IMedicalWorkerRepository reposi
     {
         var worker = await repository.FindAsync(request.Id, tracking: false, cancellationToken)
             ?? throw new EntityNotFoundException("Медработник не найден.");
-        return worker.ToDto();
+        return Mapping.MedicalWorkerMapping.ToDto(worker);
     }
 }

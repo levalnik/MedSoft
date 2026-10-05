@@ -6,7 +6,9 @@ public interface IDiagnosisRepository
 {
     Task<IReadOnlyList<DiagnosisDefinition>> ListAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<DiagnosisDefinition>> FindImportMatchesAsync(
-        IReadOnlyCollection<string> codes, IReadOnlyCollection<string> names, CancellationToken cancellationToken);
+        IReadOnlyCollection<string> codes,
+        IReadOnlyCollection<string> names, 
+        CancellationToken cancellationToken);
     Task<DiagnosisDefinition?> FindAsync(Guid id, bool tracking, CancellationToken cancellationToken);
     Task<bool> ExistsConflictAsync(string code, string name, Guid? excludingId, CancellationToken cancellationToken);
     void Add(DiagnosisDefinition entity);

@@ -30,7 +30,8 @@ public sealed class MedicalRecordRepository(HospitalDbContext db) : IMedicalReco
         if (db.Database.CurrentTransaction is not null)
             return (await query.AsSingleQuery().SingleOrDefaultAsync(predicate, cancellationToken))?.ToDomain();
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
+        await using var transaction =
+            await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         var row = await query.SingleOrDefaultAsync(predicate, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return row?.ToDomain();
@@ -42,7 +43,8 @@ public sealed class MedicalRecordRepository(HospitalDbContext db) : IMedicalReco
     {
         cancellationToken.ThrowIfCancellationRequested();
         var row = db.MedicalRecords.Local.SingleOrDefault(x => x.Id == record.Id)
-            ?? throw new InvalidOperationException("Перед изменением ЭМК загрузите её с tracking: true в том же Unit of Work.");
+                  ?? throw new InvalidOperationException(
+                      "Перед изменением ЭМК загрузите её с tracking: true в том же Unit of Work.");
 
         row.Version = record.Version;
         var diagnoses = row.Diagnoses.ToDictionary(x => x.Id);
@@ -51,12 +53,14 @@ public sealed class MedicalRecordRepository(HospitalDbContext db) : IMedicalReco
             if (diagnoses.TryGetValue(diagnosis.Id, out var existing)) diagnosis.UpdateDbo(existing);
             else row.Diagnoses.Add(diagnosis.ToDbo());
         }
+
         var prescriptions = row.Prescriptions.ToDictionary(x => x.Id);
         foreach (var prescription in record.Prescriptions)
         {
             if (prescriptions.TryGetValue(prescription.Id, out var existing)) prescription.UpdateDbo(existing);
             else row.Prescriptions.Add(prescription.ToDbo());
         }
+
         var eventIds = row.HistoryEvents.Select(x => x.Id).ToHashSet();
         foreach (var historyEvent in record.HistoryEvents.Where(x => !eventIds.Contains(x.Id)))
             row.HistoryEvents.Add(historyEvent.ToDbo());

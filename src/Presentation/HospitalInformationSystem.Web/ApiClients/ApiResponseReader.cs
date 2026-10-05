@@ -7,6 +7,7 @@ internal static class ApiResponseReader
 {
     private const string InvalidResponseMessage =
         "Сервер вернул некорректный ответ. Обновите данные, чтобы проверить результат операции.";
+
     private static readonly JsonSerializerOptions ResponseJsonOptions = new(JsonSerializerDefaults.Web)
     {
         RespectRequiredConstructorParameters = true,
@@ -19,7 +20,7 @@ internal static class ApiResponseReader
         try
         {
             return await response.Content.ReadFromJsonAsync<T>(ResponseJsonOptions, cancellationToken)
-                ?? throw new ApiException(InvalidResponseMessage);
+                   ?? throw new ApiException(InvalidResponseMessage);
         }
         catch (JsonException exception)
         {
@@ -27,7 +28,8 @@ internal static class ApiResponseReader
         }
     }
 
-    public static async Task<IReadOnlyList<T>> ReadListAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
+    public static async Task<IReadOnlyList<T>> ReadListAsync<T>(HttpResponseMessage response,
+        CancellationToken cancellationToken)
         where T : class
     {
         var items = await ReadAsync<T[]>(response, cancellationToken);
@@ -40,8 +42,13 @@ internal static class ApiResponseReader
         if (response.IsSuccessStatusCode) return;
 
         ProblemResponse? problem = null;
-        try { problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken); }
-        catch (JsonException) { }
+        try
+        {
+            problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
+        }
+        catch (JsonException)
+        {
+        }
 
         var errors = problem?.Errors?.Values
             .SelectMany(values => values ?? [])

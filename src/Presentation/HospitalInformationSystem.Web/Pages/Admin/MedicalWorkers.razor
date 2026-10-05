@@ -4,27 +4,47 @@
 <PageTitle>Медработники · Учебная HIS</PageTitle>
 <div class="eyebrow"><span class="eyebrow-line"></span> КОМАНДА УЧРЕЖДЕНИЯ</div>
 <div class="page-heading">
-  <div><h1>Медработники</h1><p>Люди, на которых держится забота о пациентах.</p></div>
-  <a class="btn btn-primary" href="/admin/medical-workers/new"><Icon Name="plus" /> Добавить медработника</a>
+  <div><h1>Медработники</h1>
+    <p>Люди, на которых держится забота о пациентах.</p></div>
+  <a class="btn btn-primary" href="/admin/medical-workers/new">
+    <Icon Name="plus"/>
+    Добавить медработника</a>
 </div>
 
 @if (_workers is not null)
 {
   <div class="registry-summary" aria-label="Сводка по медработникам">
-    <div class="summary-item"><span class="summary-icon"><Icon Name="workers" /></span><div><span class="summary-label">Всего сотрудников</span><strong>@_workers.Count.ToString("D2")</strong></div></div>
-    <div class="summary-item"><span class="summary-icon active-icon"><Icon Name="check" /></span><div><span class="summary-label">Активные</span><strong>@_workers.Count(x => !x.IsDeleted).ToString("D2")</strong></div></div>
-    <div class="summary-item"><span class="summary-icon archived-icon"><Icon Name="record" /></span><div><span class="summary-label">Помечены удалёнными</span><strong>@_workers.Count(x => x.IsDeleted).ToString("D2")</strong></div></div>
-    <div class="summary-note"><Icon Name="record" /><span>Откройте карточку,<br />чтобы обновить данные сотрудника.</span></div>
+    <div class="summary-item"><span class="summary-icon"><Icon Name="workers"/></span>
+      <div><span class="summary-label">Всего сотрудников</span><strong>@_workers.Count.ToString("D2")</strong></div>
+    </div>
+    <div class="summary-item"><span class="summary-icon active-icon"><Icon Name="check"/></span>
+      <div><span class="summary-label">Активные</span><strong>@_workers.Count(x => !x.IsDeleted).ToString("D2")</strong>
+      </div>
+    </div>
+    <div class="summary-item"><span class="summary-icon archived-icon"><Icon Name="record"/></span>
+      <div><span
+          class="summary-label">Помечены удалёнными</span><strong>@_workers.Count(x => x.IsDeleted).ToString("D2")</strong>
+      </div>
+    </div>
+    <div class="summary-note">
+      <Icon Name="record"/>
+      <span>Откройте карточку,<br/>чтобы обновить данные сотрудника.</span></div>
   </div>
 }
-<ErrorAlert Message="@_error" />
-<ConfirmDelete Worker="_pendingDelete" Busy="_deleting" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
+<ErrorAlert Message="@_error"/>
+<ConfirmDelete Worker="_pendingDelete" Busy="_deleting" OnConfirm="DeleteAsync" OnCancel="CancelDelete"/>
 
 <section class="surface" aria-label="Реестр медработников">
-  <div class="registry-heading"><div><h2>Реестр сотрудников</h2><p>Имя, должность и статус в учреждении.</p></div><span class="section-index">01 / КОМАНДА</span></div>
+  <div class="registry-heading">
+    <div><h2>Реестр сотрудников</h2>
+      <p>Имя, должность и статус в учреждении.</p></div>
+    <span class="section-index">01 / КОМАНДА</span></div>
   <div class="table-toolbar">
-    <div class="search-field"><Icon Name="search" /><input type="search" aria-label="Поиск медработника" placeholder="Имя, фамилия или должность" @bind="_search" @bind:event="oninput" /></div>
-    <label class="checkbox-label"><input type="checkbox" @bind="_includeDeleted" /> Показывать удалённых</label>
+    <div class="search-field">
+      <Icon Name="search"/>
+      <input type="search" aria-label="Поиск медработника" placeholder="Имя, фамилия или должность" @bind="_search"
+             @bind:event="oninput"/></div>
+    <label class="checkbox-label"><input type="checkbox" @bind="_includeDeleted"/> Показывать удалённых</label>
   </div>
   @if (_loading)
   {
@@ -32,83 +52,136 @@
   }
   else if (_workers is null)
   {
-    <div class="empty-state"><h2>Не удалось загрузить список</h2><p>Проверьте подключение к серверу и повторите попытку.</p><button class="btn btn-outline-primary" @onclick="LoadAsync">Повторить</button></div>
+    <div class="empty-state"><h2>Не удалось загрузить список</h2>
+      <p>Проверьте подключение к серверу и повторите попытку.</p>
+      <button class="btn btn-outline-primary" @onclick="LoadAsync">Повторить</button>
+    </div>
   }
   else
   {
     <div class="table-responsive">
       <table class="table worker-table">
-        <thead><tr><th scope="col">Сотрудник</th><th scope="col">Должность</th><th scope="col">Статус</th><th scope="col" class="actions-cell">Действия</th></tr></thead>
+        <thead>
+        <tr>
+          <th scope="col">Сотрудник</th>
+          <th scope="col">Должность</th>
+          <th scope="col">Статус</th>
+          <th scope="col" class="actions-cell">Действия</th>
+        </tr>
+        </thead>
         <tbody>
-          @foreach (var worker in VisibleWorkers)
-          {
-            <tr @key="worker.Id" class="@(worker.IsDeleted ? "deleted-row" : "")">
-              <td><a class="worker-name" href="/admin/medical-workers/@worker.Id"><span class="table-avatar">@worker.LastName[0]@worker.FirstName[0]</span><span><span class="worker-fullname">@worker.LastName @worker.FirstName</span><small>Карточка сотрудника</small></span></a></td>
-              <td class="position-cell" data-label="Должность">@worker.Position</td>
-              <td data-label="Статус"><WorkerStatus IsDeleted="worker.IsDeleted" /></td>
-              <td class="actions-cell">
-                <a class="row-edit" href="/admin/medical-workers/@worker.Id" aria-label="Редактировать: @worker.LastName @worker.FirstName" title="Редактировать">Открыть <Icon Name="forward" /></a>
-                @if (!worker.IsDeleted)
-                {
-                  <button class="icon-button danger" aria-label="Удалить: @worker.LastName @worker.FirstName" title="Пометить удалённым" disabled="@_deleting" @onclick="() => _pendingDelete = worker"><Icon Name="delete" /></button>
-                }
-              </td>
-            </tr>
-          }
+        @foreach (var worker in VisibleWorkers)
+        {
+          <tr @key="worker.Id" class="@(worker.IsDeleted ? "deleted-row" : "")">
+            <td><a class="worker-name" href="/admin/medical-workers/@worker.Id"><span
+                  class="table-avatar">@worker.LastName[0]@worker.FirstName[0]</span><span><span
+                    class="worker-fullname">@worker.LastName @worker.FirstName</span><small>Карточка сотрудника</small></span></a>
+            </td>
+            <td class="position-cell" data-label="Должность">@worker.Position</td>
+            <td data-label="Статус">
+              <WorkerStatus IsDeleted="worker.IsDeleted"/>
+            </td>
+            <td class="actions-cell">
+              <a class="row-edit" href="/admin/medical-workers/@worker.Id"
+                 aria-label="Редактировать: @worker.LastName @worker.FirstName" title="Редактировать">Открыть
+                <Icon Name="forward"/>
+              </a>
+              @if (!worker.IsDeleted)
+              {
+                <button class="icon-button danger" aria-label="Удалить: @worker.LastName @worker.FirstName"
+                        title="Пометить удалённым" disabled="@_deleting" @onclick="() => _pendingDelete = worker">
+                  <Icon Name="delete"/>
+                </button>
+              }
+            </td>
+          </tr>
+        }
         </tbody>
       </table>
     </div>
     @if (!VisibleWorkers.Any())
     {
-      <div class="empty-state"><h2>Медработники не найдены</h2><p>Измените условия поиска или добавьте сотрудника.</p></div>
+      <div class="empty-state"><h2>Медработники не найдены</h2>
+        <p>Измените условия поиска или добавьте сотрудника.</p></div>
     }
-    <div class="table-footer"><span>Показано @VisibleWorkers.Count() из @_workers.Count сотрудников</span><span>Удалённые записи сохраняются в реестре</span></div>
+
+    <div class="table-footer"><span>Показано @VisibleWorkers.Count() из @_workers.Count сотрудников</span><span>Удалённые записи сохраняются в реестре</span>
+    </div>
   }
 </section>
 
 @code {
-    private IReadOnlyList<MedicalWorkerDto>? _workers;
-    private MedicalWorkerDto? _pendingDelete;
-    private string? _error;
-    private string _search = "";
-    private bool _includeDeleted = true;
-    private bool _loading = true;
-    private bool _deleting;
-    private IEnumerable<MedicalWorkerDto> VisibleWorkers => (_workers ?? [])
-        .Where(x => (_includeDeleted || !x.IsDeleted) &&
-            $"{x.LastName} {x.FirstName} {x.Position}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+  private IReadOnlyList<MedicalWorkerDto>? _workers;
+  private MedicalWorkerDto? _pendingDelete;
+  private string? _error;
+  private string _search = "";
+  private bool _includeDeleted = true;
+  private bool _loading = true;
+  private bool _deleting;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+  private IEnumerable<MedicalWorkerDto> VisibleWorkers => (_workers ?? [])
+    .Where(x => (_includeDeleted || !x.IsDeleted) &&
+                $"{x.LastName} {x.FirstName} {x.Position}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    private async Task LoadAsync()
+  protected override Task OnInitializedAsync() => LoadAsync();
+
+  private async Task LoadAsync()
+  {
+    _loading = true;
+    _error = null;
+    try
     {
-        _loading = true;
-        _error = null;
-        try { _workers = await Api.ListAsync(includeDeleted: true); }
-        catch (ApiException e) { _error = e.Message; }
-        catch (HttpRequestException) { _error = "Сервер недоступен. Проверьте, запущено ли приложение API."; }
-        catch (TaskCanceledException) { _error = "Сервер не ответил вовремя. Повторите попытку."; }
-        finally { _loading = false; }
+      _workers = await Api.ListAsync(includeDeleted: true);
     }
-
-    private void CancelDelete() => _pendingDelete = null;
-
-    private async Task DeleteAsync()
+    catch (ApiException e)
     {
-        if (_pendingDelete is null || _deleting) return;
-        _deleting = true;
-        _error = null;
-        try
-        {
-            var deletedId = _pendingDelete.Id;
-            await Api.DeleteAsync(deletedId);
-            _workers = _workers?.Select(worker => worker.Id == deletedId ? worker with { IsDeleted = true } : worker).ToArray();
-            _pendingDelete = null;
-            await LoadAsync();
-        }
-        catch (ApiException e) { _error = e.Message; }
-        catch (HttpRequestException) { _error = "Не удалось связаться с сервером."; }
-        catch (TaskCanceledException) { _error = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат."; }
-        finally { _deleting = false; }
+      _error = e.Message;
     }
+    catch (HttpRequestException)
+    {
+      _error = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+    }
+    catch (TaskCanceledException)
+    {
+      _error = "Сервер не ответил вовремя. Повторите попытку.";
+    }
+    finally
+    {
+      _loading = false;
+    }
+  }
+
+  private void CancelDelete() => _pendingDelete = null;
+
+  private async Task DeleteAsync()
+  {
+    if (_pendingDelete is null || _deleting) return;
+    _deleting = true;
+    _error = null;
+    try
+    {
+      var deletedId = _pendingDelete.Id;
+      await Api.DeleteAsync(deletedId);
+      _workers = _workers?.Select(worker => worker.Id == deletedId ? worker with { IsDeleted = true } : worker).ToArray();
+      _pendingDelete = null;
+      await LoadAsync();
+    }
+    catch (ApiException e)
+    {
+      _error = e.Message;
+    }
+    catch (HttpRequestException)
+    {
+      _error = "Не удалось связаться с сервером.";
+    }
+    catch (TaskCanceledException)
+    {
+      _error = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат.";
+    }
+    finally
+    {
+      _deleting = false;
+    }
+  }
+
 }

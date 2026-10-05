@@ -1,7 +1,11 @@
+using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
@@ -10,6 +14,7 @@ using HospitalInformationSystem.Infrastructure.Contexts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace HospitalInformationSystem.IntegrationTests;
 
@@ -43,7 +48,8 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     [InlineData("sex", "POST")]
     [InlineData("birthDate", "PUT")]
     [InlineData("sex", "PUT")]
-    public async Task Missing_required_patient_fields_do_not_silently_replace_them_with_defaults(string field, string method)
+    public async Task Missing_required_patient_fields_do_not_silently_replace_them_with_defaults(string field,
+        string method)
     {
         var data = ValidRequest("patients");
         var route = "/api/patients";
@@ -54,9 +60,11 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
             before = (await created.Content.ReadFromJsonAsync<PatientDto>())!;
             route += "/" + before.Id;
         }
+
         var listBefore = await _client.GetStringAsync("/api/patients");
         data.Remove(field);
-        using var request = new HttpRequestMessage(new HttpMethod(method), route) { Content = JsonContent.Create(data) };
+        using var request = new HttpRequestMessage(new HttpMethod(method), route)
+            { Content = JsonContent.Create(data) };
         var response = await _client.SendAsync(request);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await _client.GetStringAsync("/api/patients")).Should().Be(listBefore);
@@ -114,7 +122,8 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     [Fact]
     public async Task Invalid_prescription_text_does_not_change_record_or_history()
     {
-        var authorResponse = await _client.PostAsJsonAsync("/api/medical-workers", new SaveMedicalWorkerRequest("Алексей", "Проверочный", "Врач"));
+        var authorResponse = await _client.PostAsJsonAsync("/api/medical-workers",
+            new SaveMedicalWorkerRequest("Алексей", "Проверочный", "Врач"));
         var author = (await authorResponse.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
         var patientResponse = await _client.PostAsJsonAsync("/api/patients", ValidRequest("patients"));
         var patient = (await patientResponse.Content.ReadFromJsonAsync<PatientDto>())!;

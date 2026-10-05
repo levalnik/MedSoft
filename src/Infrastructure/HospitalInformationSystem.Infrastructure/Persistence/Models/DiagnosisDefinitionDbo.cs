@@ -8,4 +8,3 @@ public sealed class DiagnosisDefinitionDbo
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
-

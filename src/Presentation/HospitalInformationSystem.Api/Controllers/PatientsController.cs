@@ -23,7 +23,8 @@ public sealed class PatientsController(ISender sender) : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<PatientDto>(StatusCodes.Status201Created)]
-    public async Task<ActionResult<PatientDto>> CreateAsync(SavePatientRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<PatientDto>> CreateAsync(SavePatientRequest request,
+        CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CreatePatientCommand(request.FirstName, request.LastName, request.MiddleName,
             request.BirthDate, request.Sex, request.Comment), cancellationToken);
@@ -31,7 +32,8 @@ public sealed class PatientsController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<PatientDto>> UpdateAsync(Guid id, SavePatientRequest request, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<PatientDto>> UpdateAsync(Guid id, SavePatientRequest request,
+        CancellationToken cancellationToken) =>
         Ok(await sender.Send(new UpdatePatientCommand(id, request.FirstName, request.LastName, request.MiddleName,
             request.BirthDate, request.Sex, request.Comment), cancellationToken));
 
@@ -43,4 +45,3 @@ public sealed class PatientsController(ISender sender) : ControllerBase
         return NoContent();
     }
 }
-

@@ -1,12 +1,11 @@
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Infrastructure.Contexts;
 using HospitalInformationSystem.Infrastructure.Initializers;
-using HospitalInformationSystem.Infrastructure.Persistence;
 using HospitalInformationSystem.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace HospitalInformationSystem.Infrastructure;
+namespace HospitalInformationSystem.Infrastructure.DI;
 
 public static class DependencyInjection
 {

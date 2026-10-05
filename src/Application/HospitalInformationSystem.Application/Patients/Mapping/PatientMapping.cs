@@ -2,7 +2,7 @@ using HospitalInformationSystem.Contracts.Patients;
 using HospitalInformationSystem.Domain.Patients;
 using Riok.Mapperly.Abstractions;
 
-namespace HospitalInformationSystem.Application.Patients;
+namespace HospitalInformationSystem.Application.Patients.Mapping;
 
 [Mapper]
 internal static partial class PatientMapping
@@ -15,4 +15,3 @@ internal static partial class PatientMapping
     public static partial Domain.Patients.AdministrativeSex ToDomain(
         this Contracts.Patients.AdministrativeSex sex);
 }
-

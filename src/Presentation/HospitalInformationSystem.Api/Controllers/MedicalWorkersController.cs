@@ -24,15 +24,20 @@ public sealed class MedicalWorkersController(ISender sender) : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<MedicalWorkerDto>(StatusCodes.Status201Created)]
-    public async Task<ActionResult<MedicalWorkerDto>> CreateAsync(SaveMedicalWorkerRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<MedicalWorkerDto>> CreateAsync(SaveMedicalWorkerRequest request,
+        CancellationToken cancellationToken)
     {
-        var worker = await sender.Send(new CreateMedicalWorkerCommand(request.FirstName, request.LastName, request.Position), cancellationToken);
+        var worker =
+            await sender.Send(new CreateMedicalWorkerCommand(request.FirstName, request.LastName, request.Position),
+                cancellationToken);
         return CreatedAtAction("Get", new { id = worker.Id }, worker);
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<MedicalWorkerDto>> UpdateAsync(Guid id, SaveMedicalWorkerRequest request, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new UpdateMedicalWorkerCommand(id, request.FirstName, request.LastName, request.Position), cancellationToken));
+    public async Task<ActionResult<MedicalWorkerDto>> UpdateAsync(Guid id, SaveMedicalWorkerRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new UpdateMedicalWorkerCommand(id, request.FirstName, request.LastName, request.Position),
+            cancellationToken));
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

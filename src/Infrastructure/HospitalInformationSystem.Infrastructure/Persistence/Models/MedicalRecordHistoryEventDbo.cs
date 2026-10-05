@@ -13,4 +13,3 @@ public sealed class MedicalRecordHistoryEventDbo
     public Guid? EntityId { get; set; }
     public string PayloadJson { get; set; } = string.Empty;
 }
-

@@ -38,6 +38,7 @@ public static class DiagnosisCsvParser
                 throw Error(line, "Нулевой символ недопустим в коде и названии.");
             rows.Add(new DiagnosisCsvRow(line, fields[0].Trim(), fields[1].Trim()));
         }
+
         if (rows.Count == 0)
             throw Error(1, "Добавьте хотя бы один диагноз после заголовка.");
         return rows;
@@ -45,7 +46,10 @@ public static class DiagnosisCsvParser
 
     private static string[]? ReadFields(TextFieldParser parser)
     {
-        try { return parser.ReadFields(); }
+        try
+        {
+            return parser.ReadFields();
+        }
         catch (MalformedLineException)
         {
             throw Error(parser.ErrorLineNumber, "Некорректный CSV: проверьте кавычки и разделители.");

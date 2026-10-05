@@ -2,7 +2,7 @@ using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Domain.MedicalRecords;
 using Riok.Mapperly.Abstractions;
 
-namespace HospitalInformationSystem.Application.MedicalRecords;
+namespace HospitalInformationSystem.Application.MedicalRecords.Mapping;
 
 [Mapper]
 public static partial class MedicalRecordMapping

@@ -59,7 +59,8 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
     [InlineData("Елена", "123456789012345678901234567890123", "Female")]
     [InlineData("Елена", null, "999")]
     [InlineData("Елена", null, "InvalidSex")]
-    public async Task Invalid_patient_fields_or_sex_return_400_without_inserting(string? firstName, string? comment, string sex)
+    public async Task Invalid_patient_fields_or_sex_return_400_without_inserting(string? firstName, string? comment,
+        string sex)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
@@ -100,16 +101,19 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
         var token = Guid.NewGuid().ToString("N");
         var code = token[..6];
         var name = "Диагноз " + token[..8];
-        var create = await _client.PostAsJsonAsync("/api/diagnoses", new SaveDiagnosisRequest(" " + code + " ", " " + name + " "));
+        var create = await _client.PostAsJsonAsync("/api/diagnoses",
+            new SaveDiagnosisRequest(" " + code + " ", " " + name + " "));
         create.StatusCode.Should().Be(HttpStatusCode.Created);
         var diagnosis = (await create.Content.ReadFromJsonAsync<DiagnosisDefinitionDto>())!;
         diagnosis.Code.Should().Be(code);
         diagnosis.Name.Should().Be(name);
 
-        var duplicateCode = await _client.PostAsJsonAsync("/api/diagnoses", new SaveDiagnosisRequest(code, "Другое " + token[..8]));
+        var duplicateCode =
+            await _client.PostAsJsonAsync("/api/diagnoses", new SaveDiagnosisRequest(code, "Другое " + token[..8]));
         duplicateCode.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await duplicateCode.Content.ReadFromJsonAsync<ProblemDetails>())!.Status.Should().Be(409);
-        var duplicateName = await _client.PostAsJsonAsync("/api/diagnoses", new SaveDiagnosisRequest(token[8..14], name));
+        var duplicateName =
+            await _client.PostAsJsonAsync("/api/diagnoses", new SaveDiagnosisRequest(token[8..14], name));
         duplicateName.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
         var updatedName = "Изменен " + token[..8];
@@ -122,7 +126,8 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
-        (await db.DiagnosisDefinitions.AsNoTracking().SingleAsync(x => x.Id == diagnosis.Id)).Name.Should().Be(updatedName);
+        (await db.DiagnosisDefinitions.AsNoTracking().SingleAsync(x => x.Id == diagnosis.Id)).Name.Should()
+            .Be(updatedName);
         (await _client.DeleteAsync($"/api/diagnoses/{diagnosis.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await db.DiagnosisDefinitions.AnyAsync(x => x.Id == diagnosis.Id)).Should().BeFalse();
     }

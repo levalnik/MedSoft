@@ -64,7 +64,8 @@ public sealed class MedicalRecordReadProbe : DbCommandInterceptor
         var observation = _observation;
         if (observation is null || !command.CommandText.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) ||
             !command.CommandText.Contains("medical_records", StringComparison.Ordinal) ||
-            !command.Parameters.Cast<DbParameter>().Any(parameter => parameter.Value is Guid id && id == observation.RecordId))
+            !command.Parameters.Cast<DbParameter>()
+                .Any(parameter => parameter.Value is Guid id && id == observation.RecordId))
             return result;
 
         var contextId = eventData.Context!.ContextId.InstanceId;
@@ -76,11 +77,13 @@ public sealed class MedicalRecordReadProbe : DbCommandInterceptor
             observation.Commands.Add(command.CommandText);
             first = observation.Commands.Count == 1;
         }
+
         if (first)
         {
             observation.HeaderRead.TrySetResult();
             await observation.Resume.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
         }
+
         return result;
     }
 
@@ -113,6 +116,7 @@ public sealed class ConcurrentRecordReadGate : DbCommandInterceptor
             if (position == 2) pair.Ready.TrySetResult();
             if (position <= 2) await pair.Ready.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
         }
+
         return result;
     }
 

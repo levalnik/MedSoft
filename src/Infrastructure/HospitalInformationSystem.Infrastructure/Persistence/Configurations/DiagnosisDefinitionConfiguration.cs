@@ -23,4 +23,3 @@ public sealed class DiagnosisDefinitionConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ux_diagnosis_definitions_name");
     }
 }
-

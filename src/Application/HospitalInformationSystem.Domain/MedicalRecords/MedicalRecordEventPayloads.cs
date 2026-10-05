@@ -3,7 +3,10 @@ namespace HospitalInformationSystem.Domain.MedicalRecords;
 public sealed record MedicalRecordCreatedPayload(Guid PatientId);
 
 public sealed record DiagnosisAddedPayload(
-    Guid MedicalRecordDiagnosisId, Guid DiagnosisDefinitionId, string Code, string Name);
+    Guid MedicalRecordDiagnosisId,
+    Guid DiagnosisDefinitionId,
+    string Code,
+    string Name);
 
 public sealed record DiagnosisRemovedPayload(Guid MedicalRecordDiagnosisId, string Code, string Name);
 

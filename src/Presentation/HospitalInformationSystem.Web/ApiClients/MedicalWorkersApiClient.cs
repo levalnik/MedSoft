@@ -5,9 +5,11 @@ namespace HospitalInformationSystem.Web.ApiClients;
 
 public sealed class MedicalWorkersApiClient(HttpClient http)
 {
-    public async Task<IReadOnlyList<MedicalWorkerDto>> ListAsync(bool includeDeleted, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MedicalWorkerDto>> ListAsync(bool includeDeleted,
+        CancellationToken cancellationToken = default)
     {
-        using var response = await http.GetAsync($"api/medical-workers?includeDeleted={includeDeleted}", cancellationToken);
+        using var response =
+            await http.GetAsync($"api/medical-workers?includeDeleted={includeDeleted}", cancellationToken);
         return await ApiResponseReader.ReadListAsync<MedicalWorkerDto>(response, cancellationToken);
     }
 
@@ -17,7 +19,8 @@ public sealed class MedicalWorkersApiClient(HttpClient http)
         return await ApiResponseReader.ReadAsync<MedicalWorkerDto>(response, cancellationToken);
     }
 
-    public async Task<MedicalWorkerDto> SaveAsync(Guid? id, SaveMedicalWorkerRequest request, CancellationToken cancellationToken = default)
+    public async Task<MedicalWorkerDto> SaveAsync(Guid? id, SaveMedicalWorkerRequest request,
+        CancellationToken cancellationToken = default)
     {
         using var response = id is null
             ? await http.PostAsJsonAsync("api/medical-workers", request, cancellationToken)

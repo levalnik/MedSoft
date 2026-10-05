@@ -30,9 +30,9 @@ public sealed class PersistenceMigrationTests
         var createdAt = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
         var deletedAt = createdAt.AddHours(1);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO medical_workers (id, first_name, last_name, position, is_deleted, created_at_utc, updated_at_utc)
-            VALUES ({id}, 'Алексей', 'Орлов', 'Врач', true, {createdAt}, {deletedAt})
-            """);
+                                                       INSERT INTO medical_workers (id, first_name, last_name, position, is_deleted, created_at_utc, updated_at_utc)
+                                                       VALUES ({id}, 'Алексей', 'Орлов', 'Врач', true, {createdAt}, {deletedAt})
+                                                       """);
 
         await migrator.MigrateAsync();
 

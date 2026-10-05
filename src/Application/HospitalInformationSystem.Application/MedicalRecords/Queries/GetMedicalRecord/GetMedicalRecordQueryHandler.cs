@@ -11,7 +11,7 @@ public sealed class GetMedicalRecordQueryHandler(IMedicalRecordRepository reposi
     public async Task<MedicalRecordDto> Handle(GetMedicalRecordQuery request, CancellationToken cancellationToken)
     {
         var record = await repository.FindAsync(request.Id, tracking: false, cancellationToken)
-            ?? throw new EntityNotFoundException("ЭМК не найдена.");
-        return record.ToDto();
+                     ?? throw new EntityNotFoundException("ЭМК не найдена.");
+        return Mapping.MedicalRecordMapping.ToDto(record);
     }
 }

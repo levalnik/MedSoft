@@ -34,7 +34,8 @@ public sealed class DiagnosisRepository(HospitalDbContext db) : IDiagnosisReposi
         return row?.ToDomain();
     }
 
-    public Task<bool> ExistsConflictAsync(string code, string name, Guid? excludingId, CancellationToken cancellationToken) =>
+    public Task<bool> ExistsConflictAsync(string code, string name, Guid? excludingId,
+        CancellationToken cancellationToken) =>
         db.Set<DiagnosisDefinitionDbo>().AsNoTracking().AnyAsync(
             x => (!excludingId.HasValue || x.Id != excludingId.Value) && (x.Code == code || x.Name == name),
             cancellationToken);
@@ -44,14 +45,14 @@ public sealed class DiagnosisRepository(HospitalDbContext db) : IDiagnosisReposi
     public async Task UpdateAsync(DiagnosisDefinition entity, CancellationToken cancellationToken)
     {
         var row = await db.Set<DiagnosisDefinitionDbo>().FindAsync([entity.Id], cancellationToken)
-            ?? throw new EntityNotFoundException("Диагноз не найден.");
+                  ?? throw new EntityNotFoundException("Диагноз не найден.");
         entity.UpdateDbo(row);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         var row = await db.Set<DiagnosisDefinitionDbo>().FindAsync([id], cancellationToken)
-            ?? throw new EntityNotFoundException("Диагноз не найден.");
+                  ?? throw new EntityNotFoundException("Диагноз не найден.");
         db.Set<DiagnosisDefinitionDbo>().Remove(row);
     }
 }

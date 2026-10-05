@@ -1,8 +1,14 @@
+using System;
+using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Web.ApiClients;
+using Xunit;
 
 namespace HospitalInformationSystem.UnitTests.Web;
 
@@ -17,7 +23,10 @@ public sealed class ApiClientTests
         { "save", "" }, { "save", "null" }, { "save", "<html>Proxy error</html>" },
         { "import", "" }, { "import", "null" }, { "import", "<html>Proxy error</html>" },
         { "worker", "{}" }, { "import", "{}" }, { "workers", "[{}]" }, { "diagnoses", "[{}]" },
-        { "worker", "{\"id\":\"00000000-0000-0000-0000-000000000001\",\"firstName\":null,\"lastName\":\"Иванов\",\"position\":\"Врач\",\"isDeleted\":false}" }
+        {
+            "worker",
+            "{\"id\":\"00000000-0000-0000-0000-000000000001\",\"firstName\":null,\"lastName\":\"Иванов\",\"position\":\"Врач\",\"isDeleted\":false}"
+        }
     };
 
     [Theory]
@@ -54,7 +63,8 @@ public sealed class ApiClientTests
     [InlineData("import", "{\"detail\":\"Конфликт кодов.\",\"title\":\"Ошибка\"}", "Конфликт кодов.")]
     [InlineData("save", "{\"title\":\"Ошибка сохранения.\"}", "Ошибка сохранения.")]
     [InlineData("delete", "{\"title\":\"\",\"detail\":\" \"}", "Ошибка сервера: 502.")]
-    public async Task Server_error_uses_problem_details_or_status_fallback(string operation, string body, string message)
+    public async Task Server_error_uses_problem_details_or_status_fallback(string operation, string body,
+        string message)
     {
         using var http = CreateClient(HttpStatusCode.BadGateway, body);
 
@@ -120,26 +130,33 @@ public sealed class ApiClientTests
         await action.Should().ThrowAsync<OperationCanceledException>();
     }
 
-    private static Task RequestAsync(string operation, HttpClient http, CancellationToken cancellationToken = default) => operation switch
-    {
-        "workers" => new MedicalWorkersApiClient(http).ListAsync(true, cancellationToken),
-        "worker" => new MedicalWorkersApiClient(http).GetAsync(Guid.NewGuid(), cancellationToken),
-        "save" => new MedicalWorkersApiClient(http).SaveAsync(null, new SaveMedicalWorkerRequest("Иван", "Иванов", "Терапевт"), cancellationToken),
-        "delete" => new MedicalWorkersApiClient(http).DeleteAsync(Guid.NewGuid(), cancellationToken),
-        "diagnoses" => new DiagnosesApiClient(http).ListAsync(cancellationToken),
-        "import" => new DiagnosesApiClient(http).ImportAsync(new MemoryStream(Encoding.UTF8.GetBytes("Code,Name\nA00.00,Холера")), "diagnoses.csv", cancellationToken),
-        _ => throw new ArgumentOutOfRangeException(nameof(operation))
-    };
+    private static Task
+        RequestAsync(string operation, HttpClient http, CancellationToken cancellationToken = default) =>
+        operation switch
+        {
+            "workers" => new MedicalWorkersApiClient(http).ListAsync(true, cancellationToken),
+            "worker" => new MedicalWorkersApiClient(http).GetAsync(Guid.NewGuid(), cancellationToken),
+            "save" => new MedicalWorkersApiClient(http).SaveAsync(null,
+                new SaveMedicalWorkerRequest("Иван", "Иванов", "Терапевт"), cancellationToken),
+            "delete" => new MedicalWorkersApiClient(http).DeleteAsync(Guid.NewGuid(), cancellationToken),
+            "diagnoses" => new DiagnosesApiClient(http).ListAsync(cancellationToken),
+            "import" => new DiagnosesApiClient(http).ImportAsync(
+                new MemoryStream(Encoding.UTF8.GetBytes("Code,Name\nA00.00,Холера")), "diagnoses.csv",
+                cancellationToken),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
 
     private static HttpClient CreateClient(HttpStatusCode status, string body) =>
         new(new ResponseHandler(status, body)) { BaseAddress = new Uri("http://localhost/") };
 
     private sealed class ResponseHandler(HttpStatusCode status, string body) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
+            return Task.FromResult(new HttpResponseMessage(status)
+                { Content = new StringContent(body, Encoding.UTF8, "application/json") });
         }
     }
 }

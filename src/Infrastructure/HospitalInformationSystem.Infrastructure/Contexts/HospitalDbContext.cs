@@ -19,7 +19,8 @@ public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(HospitalDbContext).Assembly);
 
-    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -27,13 +28,19 @@ public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> option
         }
         catch (DbUpdateConcurrencyException exception)
         {
-            throw new BusinessConflictException("Данные уже изменены другим запросом. Обновите страницу и повторите операцию.", exception);
+            throw new BusinessConflictException(
+                "Данные уже изменены другим запросом. Обновите страницу и повторите операцию.", exception);
         }
         catch (Exception exception) when (exception.GetBaseException() is PostgresException postgres &&
-            postgres.SqlState is PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.ForeignKeyViolation
-                or PostgresErrorCodes.CheckViolation or PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected)
+                                          postgres.SqlState is PostgresErrorCodes.UniqueViolation
+                                              or PostgresErrorCodes.ForeignKeyViolation
+                                              or PostgresErrorCodes.CheckViolation
+                                              or PostgresErrorCodes.SerializationFailure
+                                              or PostgresErrorCodes.DeadlockDetected)
         {
-            throw new BusinessConflictException("Сохранение конфликтует с существующей записью, связями или одновременным изменением. Обновите данные и повторите операцию.", exception);
+            throw new BusinessConflictException(
+                "Сохранение конфликтует с существующей записью, связями или одновременным изменением. Обновите данные и повторите операцию.",
+                exception);
         }
     }
 }
