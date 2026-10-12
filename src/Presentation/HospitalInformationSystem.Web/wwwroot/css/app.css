@@ -145,6 +145,7 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--green); fl
 .confirm-panel p { font-size: 12px; color: #977c5a; margin: 6px 0 0; }
 .btn-danger { --bs-btn-bg: #9c5546; --bs-btn-border-color: #9c5546; --bs-btn-hover-bg: #804335; --bs-btn-hover-border-color: #804335; }
 .alert-danger { --bs-alert-bg: #fcf0ea; --bs-alert-color: #99543f; --bs-alert-border-color: #e6c9bc; font-size: 12px; border-radius: 8px; }
+.alert-warning { --bs-alert-bg: #fbf5e6; --bs-alert-color: #8a6d2f; --bs-alert-border-color: #ecdcb2; font-size: 12px; border-radius: 8px; }
 .empty-state { text-align: center; padding: 64px 24px; color: #839077; }
 .empty-state h2 { color: #586f50; margin-bottom: 12px; }
 .empty-state p { font-size: 13px; line-height: 1.8; }
