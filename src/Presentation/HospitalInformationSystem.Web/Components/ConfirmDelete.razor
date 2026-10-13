@@ -31,7 +31,11 @@
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    if (!_focusRequested) return;
+    if (!_focusRequested)
+    {
+      return;
+    }
+
     _focusRequested = false;
     await _panel.FocusAsync();
   }

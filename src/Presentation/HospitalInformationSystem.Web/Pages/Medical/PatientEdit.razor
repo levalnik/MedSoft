@@ -153,7 +153,11 @@ else
 
   protected override async Task OnParametersSetAsync()
   {
-    if (_loadedId == Id && _model is not null) return;
+    if (_loadedId == Id && _model is not null)
+    {
+      return;
+    }
+
     _loadedId = Id;
     await LoadAsync();
   }
@@ -173,7 +177,11 @@ else
     try
     {
       var patient = Id is { } id ? await Api.GetAsync(id, token) : null;
-      if (!IsCurrent(token)) return;
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
       _patient = patient;
       _model = patient is null
         ? new PatientForm { BirthDate = new DateOnly(2000, 1, 1), Sex = AdministrativeSex.Unknown }
@@ -188,47 +196,79 @@ else
     }
     catch (ApiException e)
     {
-      if (IsCurrent(token)) _error = e.Message;
+      if (IsCurrent(token))
+      {
+        _error = e.Message;
+      }
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(token)) _error = "Не удалось связаться с сервером.";
+      if (IsCurrent(token))
+      {
+        _error = "Не удалось связаться с сервером.";
+      }
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(token)) _error = "Сервер не ответил вовремя. Повторите попытку.";
+      if (IsCurrent(token))
+      {
+        _error = "Сервер не ответил вовремя. Повторите попытку.";
+      }
     }
     finally
     {
-      if (IsCurrent(token)) _loading = false;
+      if (IsCurrent(token))
+      {
+        _loading = false;
+      }
     }
   }
 
   private Task SaveAsync() => ExecuteAsync(async token =>
   {
-    if (_model is null) return;
+    if (_model is null)
+    {
+      return;
+    }
+
     var request = new SavePatientRequest(
       _model.FirstName.Trim(), _model.LastName.Trim(), Normalize(_model.MiddleName),
       _model.BirthDate, _model.Sex, Normalize(_model.Comment));
-    if (Id is { } id) await Api.UpdateAsync(id, request, token);
-    else await Api.CreateAsync(request, token);
+    if (Id is { } id)
+    {
+      await Api.UpdateAsync(id, request, token);
+    }
+    else
+    {
+      await Api.CreateAsync(request, token);
+    }
   });
 
   private Task DeleteAsync() => ExecuteAsync(async token =>
   {
-    if (Id is { } id) await Api.DeleteAsync(id, token);
+    if (Id is { } id)
+    {
+      await Api.DeleteAsync(id, token);
+    }
   });
 
   private async Task ExecuteAsync(Func<CancellationToken, Task> action)
   {
-    if (_busy || _routeCancellation is null || _disposed) return;
+    if (_busy || _routeCancellation is null || _disposed)
+    {
+      return;
+    }
+
     var token = _routeCancellation.Token;
     _busy = true;
     _error = null;
     try
     {
       await action(token);
-      if (IsCurrent(token)) Navigation.NavigateTo("/medical/patients");
+      if (IsCurrent(token))
+      {
+        Navigation.NavigateTo("/medical/patients");
+      }
     }
     catch (OperationCanceledException) when (token.IsCancellationRequested)
     {
@@ -243,15 +283,24 @@ else
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(token)) _error = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      if (IsCurrent(token))
+      {
+        _error = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      }
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(token)) _error = "Сервер не ответил вовремя. Проверьте список перед повторной операцией.";
+      if (IsCurrent(token))
+      {
+        _error = "Сервер не ответил вовремя. Проверьте список перед повторной операцией.";
+      }
     }
     finally
     {
-      if (IsCurrent(token)) _busy = false;
+      if (IsCurrent(token))
+      {
+        _busy = false;
+      }
     }
   }
 

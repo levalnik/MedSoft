@@ -131,7 +131,11 @@ else
     try
     {
       var worker = Id is { } id ? await Api.GetAsync(id, cancellationToken) : null;
-      if (!IsCurrent(cancellationToken)) return;
+      if (!IsCurrent(cancellationToken))
+      {
+        return;
+      }
+
       _worker = worker;
       _model = new WorkerForm { FirstName = _worker?.FirstName ?? "", LastName = _worker?.LastName ?? "", Position = _worker?.Position ?? "" };
     }
@@ -140,62 +144,100 @@ else
     }
     catch (ApiException e)
     {
-      if (IsCurrent(cancellationToken)) _error = e.Message;
+      if (IsCurrent(cancellationToken))
+      {
+        _error = e.Message;
+      }
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(cancellationToken)) _error = "Не удалось связаться с сервером.";
+      if (IsCurrent(cancellationToken))
+      {
+        _error = "Не удалось связаться с сервером.";
+      }
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(cancellationToken)) _error = "Сервер не ответил вовремя. Повторите попытку.";
+      if (IsCurrent(cancellationToken))
+      {
+        _error = "Сервер не ответил вовремя. Повторите попытку.";
+      }
     }
     finally
     {
-      if (IsCurrent(cancellationToken)) _loading = false;
+      if (IsCurrent(cancellationToken))
+      {
+        _loading = false;
+      }
     }
   }
 
   private Task SaveAsync() => ExecuteAsync(async cancellationToken =>
   {
-    if (_model is null) return;
+    if (_model is null)
+    {
+      return;
+    }
+
     await Api.SaveAsync(Id, new SaveMedicalWorkerRequest(_model.FirstName, _model.LastName, _model.Position), cancellationToken);
   });
 
   private Task DeleteAsync() => ExecuteAsync(async cancellationToken =>
   {
-    if (Id is { } id) await Api.DeleteAsync(id, cancellationToken);
+    if (Id is { } id)
+    {
+      await Api.DeleteAsync(id, cancellationToken);
+    }
   });
 
   private async Task ExecuteAsync(Func<CancellationToken, Task> action)
   {
-    if (_busy || _routeCancellation is null || _disposed) return;
+    if (_busy || _routeCancellation is null || _disposed)
+    {
+      return;
+    }
+
     var cancellationToken = _routeCancellation.Token;
     _busy = true;
     _error = null;
     try
     {
       await action(cancellationToken);
-      if (IsCurrent(cancellationToken)) Navigation.NavigateTo("/admin/medical-workers");
+      if (IsCurrent(cancellationToken))
+      {
+        Navigation.NavigateTo("/admin/medical-workers");
+      }
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
     {
     }
     catch (ApiException e)
     {
-      if (IsCurrent(cancellationToken)) _error = e.Message;
+      if (IsCurrent(cancellationToken))
+      {
+        _error = e.Message;
+      }
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(cancellationToken)) _error = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      if (IsCurrent(cancellationToken))
+      {
+        _error = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      }
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(cancellationToken)) _error = "Сервер не ответил вовремя. Проверьте список перед повторным сохранением.";
+      if (IsCurrent(cancellationToken))
+      {
+        _error = "Сервер не ответил вовремя. Проверьте список перед повторным сохранением.";
+      }
     }
     finally
     {
-      if (IsCurrent(cancellationToken)) _busy = false;
+      if (IsCurrent(cancellationToken))
+      {
+        _busy = false;
+      }
     }
   }
 

@@ -325,7 +325,8 @@ else
               <input id="snapshot-at" type="datetime-local" step="1" class="form-control" @bind="_snapshotAt"
                      @bind:format="yyyy-MM-ddTHH:mm:ss"/>
             </div>
-            <button class="btn btn-outline-primary" disabled="@_snapshotBusy" @onclick="LoadSnapshotAsync">
+            <button class="btn btn-outline-primary" disabled="@(_snapshotBusy || _snapshotAt is null)"
+                    @onclick="LoadSnapshotAsync">
               @(_snapshotBusy ? "Загрузка…" : "Показать состояние")
             </button>
             @if (_snapshot is not null)
@@ -402,7 +403,7 @@ else
   private string _prescriptionText = "";
   private Guid? _replaceId;
   private string _replaceText = "";
-  private DateTime _snapshotAt = DateTime.Now;
+  private DateTime? _snapshotAt = DateTime.Now;
   private bool _snapshotBusy;
   private string? _loadError;
   private string? _actionError;
@@ -420,53 +421,61 @@ else
 
   protected override async Task OnParametersSetAsync()
   {
-    if (_loadedPatientId == PatientId) return;
-    _loadedPatientId = PatientId;
-    if (PatientId == Guid.Empty)
+    if (_loadedPatientId == PatientId)
     {
-      ShowInvalidId();
       return;
     }
+
+    _loadedPatientId = PatientId;
     await ReloadAsync();
   }
 
-  private void ShowInvalidId()
+  // Отменяет запросы предыдущего пациента и полностью сбрасывает состояние карты.
+  // Вызывается ДО проверки идентификатора, чтобы запоздавший ответ прежнего пациента
+  // (в т.ч. при переходе к Guid.Empty) не смог заполнить карту.
+  private CancellationToken BeginNavigation()
   {
-    _loading = false;
-    _patient = null;
-    _record = null;
-    _loadError = "Некорректный идентификатор пациента.";
-  }
-
-  private async Task ReloadAsync()
-  {
-    if (PatientId == Guid.Empty)
-    {
-      ShowInvalidId();
-      return;
-    }
-
     _cts?.Cancel();
     _cts?.Dispose();
     _cts = new CancellationTokenSource();
-    var token = _cts.Token;
 
-    _loading = true;
+    _loading = false;
     _loadError = null;
     _busy = false;
     _snapshotBusy = false;
     ResetEditState();
     ClearActionMessages();
     _tab = Tab.Diagnoses;
+    _patient = null;
     _record = null;
     _snapshot = null;
     _snapshotError = null;
+    _snapshotAt = DateTime.Now;
+    _workers = null;
+    _diagnoses = null;
     InvalidateHistory();
+    return _cts.Token;
+  }
+
+  private async Task ReloadAsync()
+  {
+    var token = BeginNavigation();
+    if (PatientId == Guid.Empty)
+    {
+      _loadError = "Некорректный идентификатор пациента.";
+      return;
+    }
+
+    _loading = true;
     try
     {
       var patient = await PatientsApi.GetAsync(PatientId, token);
       var record = await RecordsApi.FindForPatientAsync(PatientId, token);
-      if (!IsCurrent(token)) return;
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
       _patient = patient;
       _record = record;
     }
@@ -475,26 +484,49 @@ else
     }
     catch (ApiException e)
     {
-      if (IsCurrent(token)) { _patient = null; _loadError = e.Message; }
+      if (IsCurrent(token))
+      {
+        _patient = null;
+        _loadError = e.Message;
+      }
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(token)) { _patient = null; _loadError = "Сервер недоступен. Проверьте, запущено ли приложение API."; }
+      if (IsCurrent(token))
+      {
+        _patient = null;
+        _loadError = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+      }
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(token)) { _patient = null; _loadError = "Сервер не ответил вовремя. Повторите попытку."; }
+      if (IsCurrent(token))
+      {
+        _patient = null;
+        _loadError = "Сервер не ответил вовремя. Повторите попытку.";
+      }
     }
     finally
     {
-      if (IsCurrent(token)) _loading = false;
+      if (IsCurrent(token))
+      {
+        _loading = false;
+      }
     }
   }
 
   private async Task SelectTabAsync(Tab tab)
   {
-    if (_busy) return;
-    if (_tab == tab) return;
+    if (_busy)
+    {
+      return;
+    }
+
+    if (_tab == tab)
+    {
+      return;
+    }
+
     _tab = tab;
     ResetEditState();
     if (tab == Tab.History && _record is not null && _history is null && !_historyLoading)
@@ -505,7 +537,11 @@ else
 
   private async Task LoadHistoryAsync()
   {
-    if (_record is null || _cts is null) return;
+    if (_record is null || _cts is null)
+    {
+      return;
+    }
+
     var token = _cts.Token;
     var version = ++_historyVersion;
     _historyLoading = true;
@@ -513,7 +549,11 @@ else
     try
     {
       var history = await RecordsApi.GetHistoryAsync(_record.Id, token);
-      if (!IsCurrent(token) || version != _historyVersion) return;
+      if (!IsCurrent(token) || version != _historyVersion)
+      {
+        return;
+      }
+
       _history = history;
     }
     catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -521,7 +561,10 @@ else
     }
     catch (ApiException e)
     {
-      if (IsCurrent(token) && version == _historyVersion) _historyError = e.Message;
+      if (IsCurrent(token) && version == _historyVersion)
+      {
+        _historyError = e.Message;
+      }
     }
     catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
     {
@@ -532,7 +575,10 @@ else
     }
     finally
     {
-      if (IsCurrent(token) && version == _historyVersion) _historyLoading = false;
+      if (IsCurrent(token) && version == _historyVersion)
+      {
+        _historyLoading = false;
+      }
     }
   }
 
@@ -565,23 +611,54 @@ else
 
   private async Task EnsureEditDataAsync()
   {
-    if (_cts is null) return;
+    if (_cts is null)
+    {
+      return;
+    }
+
     var token = _cts.Token;
     try
     {
-      _workers ??= await WorkersApi.ListAsync(includeDeleted: false, token);
-      if (_tab == Tab.Diagnoses) _diagnoses ??= await DiagnosesApi.ListAsync(token);
+      // Загружаем справочники заново при каждом входе в редактирование,
+      // чтобы в выпадающих списках не оставались устаревшие варианты.
+      _workers = await WorkersApi.ListAsync(includeDeleted: false, token);
+      if (_tab == Tab.Diagnoses)
+      {
+        _diagnoses = await DiagnosesApi.ListAsync(token);
+      }
     }
     catch (OperationCanceledException) when (token.IsCancellationRequested)
     {
     }
     catch (ApiException e)
     {
-      if (IsCurrent(token)) _actionError = e.Message;
+      if (IsCurrent(token))
+      {
+        _actionError = e.Message;
+      }
     }
     catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
     {
-      if (IsCurrent(token)) _actionError = "Не удалось загрузить справочные данные для редактирования.";
+      if (IsCurrent(token))
+      {
+        _actionError = "Не удалось загрузить справочные данные для редактирования.";
+      }
+    }
+  }
+
+  // Перезагружает справочники после ошибки устаревшего выбора
+  // (удалённый автор → 400, удалённый диагноз → 404), чтобы списки снова были актуальны.
+  private async Task RefreshEditDataAsync(CancellationToken token)
+  {
+    try
+    {
+      _workers = await WorkersApi.ListAsync(includeDeleted: false, token);
+      _diagnoses = await DiagnosesApi.ListAsync(token);
+    }
+    catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException
+                                or OperationCanceledException)
+    {
+      // Не удалось обновить справочники — оставляем прежние варианты, ошибка уже показана.
     }
   }
 
@@ -647,14 +724,22 @@ else
 
   private async Task RunMutationAsync(Func<Guid, CancellationToken, Task> action)
   {
-    if (_busy || _authorId is not { } author || _cts is null) return;
+    if (_busy || _authorId is not { } author || _cts is null)
+    {
+      return;
+    }
+
     var token = _cts.Token;
     _busy = true;
     ClearActionMessages();
     try
     {
       await action(author, token);
-      if (!IsCurrent(token)) return;
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
       // Сохранение подтверждено: сразу очищаем форму и выходим из редактирования,
       // чтобы повторная отправка не создала дубликат, даже если обновление карты ниже упадёт.
       ResetEditState();
@@ -669,20 +754,37 @@ else
       if (IsCurrent(token))
       {
         _actionError = e.Message;
-        if (e.StatusCode == HttpStatusCode.Conflict) _recordConflict = true;
+        if (e.StatusCode == HttpStatusCode.Conflict)
+        {
+          _recordConflict = true;
+        }
+        else if (e.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound)
+        {
+          // Вероятно, выбран устаревший автор (400) или диагноз (404) — обновляем справочники.
+          await RefreshEditDataAsync(token);
+        }
       }
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(token)) _actionError = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      if (IsCurrent(token))
+      {
+        _actionError = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      }
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(token)) _actionError = "Сервер не ответил вовремя. Обновите карту, чтобы проверить результат.";
+      if (IsCurrent(token))
+      {
+        _actionError = "Сервер не ответил вовремя. Обновите карту, чтобы проверить результат.";
+      }
     }
     finally
     {
-      if (IsCurrent(token)) _busy = false;
+      if (IsCurrent(token))
+      {
+        _busy = false;
+      }
     }
   }
 
@@ -691,7 +793,11 @@ else
     try
     {
       var record = await RecordsApi.FindForPatientAsync(PatientId, token);
-      if (!IsCurrent(token)) return;
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
       _record = record;
       if (_tab == Tab.History && _record is not null)
       {
@@ -712,30 +818,56 @@ else
 
   private async Task LoadSnapshotAsync()
   {
-    if (_record is null || _snapshotBusy || _cts is null) return;
+    if (_record is null || _snapshotBusy || _cts is null)
+    {
+      return;
+    }
+
+    if (_snapshotAt is not { } snapshotAt)
+    {
+      _snapshotError = "Укажите корректные дату и время.";
+      return;
+    }
+
     var token = _cts.Token;
     _snapshotBusy = true;
     _snapshotError = null;
     try
     {
-      var local = DateTime.SpecifyKind(_snapshotAt, DateTimeKind.Unspecified);
+      var local = DateTime.SpecifyKind(snapshotAt, DateTimeKind.Unspecified);
       var at = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
       _snapshot = await RecordsApi.GetSnapshotAsync(_record.Id, at, token);
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+      if (IsCurrent(token))
+      {
+        _snapshotError = "Выбранные дата и время вне допустимого диапазона.";
+      }
     }
     catch (OperationCanceledException) when (token.IsCancellationRequested)
     {
     }
     catch (ApiException e)
     {
-      if (IsCurrent(token)) _snapshotError = e.Message;
+      if (IsCurrent(token))
+      {
+        _snapshotError = e.Message;
+      }
     }
     catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
     {
-      if (IsCurrent(token)) _snapshotError = "Не удалось получить историческое состояние. Повторите попытку.";
+      if (IsCurrent(token))
+      {
+        _snapshotError = "Не удалось получить историческое состояние. Повторите попытку.";
+      }
     }
     finally
     {
-      if (IsCurrent(token)) _snapshotBusy = false;
+      if (IsCurrent(token))
+      {
+        _snapshotBusy = false;
+      }
     }
   }
 

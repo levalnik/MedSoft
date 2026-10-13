@@ -39,7 +39,10 @@ internal static class ApiResponseReader
 
     public static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        if (response.IsSuccessStatusCode) return;
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
 
         ProblemResponse? problem = null;
         try

@@ -146,48 +146,79 @@
   private bool _loading = true;
   private bool _deleting;
   private CancellationTokenSource? _cts;
+  private int _loadVersion;
   private bool _disposed;
 
   private IEnumerable<PatientDto> VisiblePatients => (_patients ?? [])
     .Where(x => $"{x.LastName} {x.FirstName} {x.MiddleName}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
 
-  protected override Task OnInitializedAsync() => LoadAsync();
+  protected override Task OnInitializedAsync()
+  {
+    _cts = new CancellationTokenSource();
+    return LoadAsync();
+  }
 
   private async Task LoadAsync()
   {
-    _cts?.Cancel();
-    _cts?.Dispose();
-    _cts = new CancellationTokenSource();
+    if (_cts is null)
+    {
+      return;
+    }
+
     var token = _cts.Token;
+    var version = ++_loadVersion;
     _loading = true;
     _error = null;
     try
     {
-      _patients = await Api.ListAsync(token);
+      var patients = await Api.ListAsync(token);
+      if (!IsCurrent(token) || version != _loadVersion)
+      {
+        return;
+      }
+
+      _patients = patients;
     }
     catch (OperationCanceledException) when (token.IsCancellationRequested)
     {
     }
     catch (ApiException e)
     {
-      if (IsCurrent(token)) _error = e.Message;
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _error = e.Message;
+      }
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(token)) _error = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _error = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+      }
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(token)) _error = "Сервер не ответил вовремя. Повторите попытку.";
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _error = "Сервер не ответил вовремя. Повторите попытку.";
+      }
     }
     finally
     {
-      if (IsCurrent(token)) _loading = false;
+      if (version == _loadVersion)
+      {
+        _loading = false;
+      }
     }
   }
 
   private void AskDelete(PatientDto patient)
   {
+    if (_deleting)
+    {
+      return;
+    }
+
     _pendingDelete = patient;
     _deleteError = null;
   }
@@ -200,7 +231,11 @@
 
   private async Task DeleteAsync()
   {
-    if (_pendingDelete is null || _deleting || _cts is null) return;
+    if (_pendingDelete is null || _deleting || _cts is null)
+    {
+      return;
+    }
+
     var token = _cts.Token;
     _deleting = true;
     _deleteError = null;
@@ -215,19 +250,19 @@
     }
     catch (ApiException e)
     {
-      if (IsCurrent(token)) _deleteError = e.Message;
+      _deleteError = e.Message;
     }
     catch (HttpRequestException)
     {
-      if (IsCurrent(token)) _deleteError = "Не удалось связаться с сервером.";
+      _deleteError = "Не удалось связаться с сервером.";
     }
     catch (TaskCanceledException)
     {
-      if (IsCurrent(token)) _deleteError = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат.";
+      _deleteError = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат.";
     }
     finally
     {
-      if (IsCurrent(token)) _deleting = false;
+      _deleting = false;
     }
   }
 
