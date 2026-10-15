@@ -1,4 +1,5 @@
 @page "/medical/patients/{PatientId:guid}/medical-record"
+@attribute [Authorize(Roles = ApplicationRoles.MedicalWorker)]
 @using System.Globalization
 @using System.Net
 @using System.Text.Json
@@ -10,6 +11,7 @@
 @inject MedicalRecordsApiClient RecordsApi
 @inject MedicalWorkersApiClient WorkersApi
 @inject DiagnosesApiClient DiagnosesApi
+@inject SessionState Session
 
 <PageTitle>Электронная медицинская карта · Учебная HIS</PageTitle>
 <a class="back-link" href="/medical/patients">
@@ -126,6 +128,7 @@ else
             <div class="mr-field mr-field-grow">
               <label for="diagnosis-select">Диагноз из справочника</label>
               <select id="diagnosis-select" class="form-control"
+                      disabled="@(_busy || _editDataLoading)"
                       value="@(_selectedDiagnosisId?.ToString() ?? "")" @onchange="OnDiagnosisSelected">
                 <option value="">— выберите диагноз —</option>
                 @foreach (var diagnosis in _diagnoses ?? [])
@@ -202,7 +205,9 @@ else
             <div class="mr-field mr-field-grow">
               <label for="prescription-text">Текст назначения</label>
               <textarea id="prescription-text" class="form-control" rows="2" maxlength="@PrescriptionTextMaxLength"
-                        placeholder="Например, Парацетамол 500 мг 3 раза в день" @bind="_prescriptionText"></textarea>
+                        disabled="@(_busy || _editDataLoading)"
+                        placeholder="Например, Парацетамол 500 мг 3 раза в день" @bind="_prescriptionText"
+                        @bind:event="oninput"></textarea>
               @if (!string.IsNullOrEmpty(_prescriptionText) && !IsPrescriptionTextValid(_prescriptionText))
               {
                 <p class="validation-message">@PrescriptionLengthMessage</p>
@@ -224,7 +229,8 @@ else
                 <div class="mr-field mr-field-grow">
                   <label for="replace-text">Новый текст назначения</label>
                   <textarea id="replace-text" class="form-control" rows="2" maxlength="@PrescriptionTextMaxLength"
-                            @bind="_replaceText"></textarea>
+                            disabled="@(_busy || _editDataLoading)"
+                            @bind="_replaceText" @bind:event="oninput"></textarea>
                   @if (!string.IsNullOrEmpty(_replaceText) && !IsPrescriptionTextValid(_replaceText))
                   {
                     <p class="validation-message">@PrescriptionLengthMessage</p>
@@ -423,6 +429,7 @@ else
   private string? _historyError;
   private int _historyVersion;
   private int _editDataVersion;
+  private bool _editDataLoading;
 
   private const int PrescriptionTextMinLength = 3;
   private const int PrescriptionTextMaxLength = 128;
@@ -630,13 +637,16 @@ else
 
     var token = _cts.Token;
     var version = ++_editDataVersion;
+    _editDataLoading = true;
+    _workers = null;
+    _diagnoses = null;
     try
     {
       // Загружаем справочники заново при каждом входе в редактирование,
       // чтобы в выпадающих списках не оставались устаревшие варианты.
       // Отдельный счётчик сеанса (_editDataVersion) защищает от гонки: запоздавший
       // ответ прежнего входа в редактирование не перезаписывает свежий список.
-      var workers = await WorkersApi.ListAsync(includeDeleted: false, token);
+      var workers = await LoadAuthorsAsync(token);
       if (!IsEditDataCurrent(token, version))
       {
         return;
@@ -671,6 +681,13 @@ else
         _actionError = "Не удалось загрузить справочные данные для редактирования.";
       }
     }
+    finally
+    {
+      if (IsEditDataCurrent(token, version))
+      {
+        _editDataLoading = false;
+      }
+    }
   }
 
   // Перезагружает справочники после ошибки устаревшего выбора
@@ -680,13 +697,17 @@ else
     var version = ++_editDataVersion;
     try
     {
-      var workers = await WorkersApi.ListAsync(includeDeleted: false, token);
+      var workers = await LoadAuthorsAsync(token);
       if (!IsEditDataCurrent(token, version))
       {
         return;
       }
 
       _workers = workers;
+      if (_authorId is { } author && !workers.Any(worker => worker.Id == author))
+      {
+        _authorId = null;
+      }
       var diagnoses = await DiagnosesApi.ListAsync(token);
       if (!IsEditDataCurrent(token, version))
       {
@@ -694,6 +715,10 @@ else
       }
 
       _diagnoses = diagnoses;
+      if (_selectedDiagnosisId is { } diagnosisId && !diagnoses.Any(diagnosis => diagnosis.Id == diagnosisId))
+      {
+        _selectedDiagnosisId = null;
+      }
     }
     catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException
                                 or OperationCanceledException)
@@ -707,10 +732,17 @@ else
   private bool IsEditDataCurrent(CancellationToken token, int version) =>
     IsCurrent(token) && version == _editDataVersion;
 
+  private async Task<IReadOnlyList<MedicalWorkerDto>> LoadAuthorsAsync(CancellationToken token)
+  {
+    var workers = await WorkersApi.ListAsync(includeDeleted: false, token);
+    return workers.Where(worker => worker.Id == Session.Current?.MedicalWorkerId && !worker.IsDeleted).ToArray();
+  }
+
   // Инвалидирует незавершённые загрузки справочников: любой запоздавший ответ отбрасывается.
   private void InvalidateEditData()
   {
     _editDataVersion++;
+    _editDataLoading = false;
   }
 
   private void CancelEdit()
@@ -805,7 +837,7 @@ else
 
   private async Task RunMutationAsync(Func<Guid, CancellationToken, Task> action)
   {
-    if (_busy || _authorId is not { } author || _cts is null)
+    if (_busy || _authorId is not { } author || author != Session.Current?.MedicalWorkerId || _cts is null)
     {
       return;
     }
@@ -917,7 +949,11 @@ else
     {
       var local = DateTime.SpecifyKind(snapshotAt, DateTimeKind.Unspecified);
       var at = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
-      _snapshot = await RecordsApi.GetSnapshotAsync(_record.Id, at, token);
+      var snapshot = await RecordsApi.GetSnapshotAsync(_record.Id, at, token);
+      if (IsCurrent(token))
+      {
+        _snapshot = snapshot;
+      }
     }
     catch (ArgumentOutOfRangeException)
     {
@@ -960,14 +996,15 @@ else
 
   private RenderFragment AuthorSelect => @<div class="mr-author">
     <label for="author-select">Автор изменения</label>
-    <select id="author-select" class="form-control" value="@(_authorId?.ToString() ?? "")" @onchange="OnAuthorSelected">
+    <select id="author-select" class="form-control" disabled="@(_busy || _editDataLoading)"
+            value="@(_authorId?.ToString() ?? "")" @onchange="OnAuthorSelected">
       <option value="">— выберите медработника —</option>
       @foreach (var worker in _workers ?? [])
       {
         <option value="@worker.Id">@worker.LastName @worker.FirstName — @worker.Position</option>
       }
     </select>
-    <p class="field-hint">Выберите активного медработника: он будет указан как автор изменения.</p>
+    <p class="field-hint">Подтвердите автора изменения. Доступен медработник, связанный с вашей учётной записью.</p>
   </div>;
 
   private RenderFragment ActionFeedback => @<text>
@@ -1021,6 +1058,10 @@ else
     {
       using var document = JsonDocument.Parse(item.PayloadJson);
       var root = document.RootElement;
+      if (root.ValueKind != JsonValueKind.Object)
+      {
+        return item.PayloadJson;
+      }
       return item.EventType switch
       {
         "MedicalRecordCreated" => "Электронная медицинская карта открыта.",
@@ -1039,7 +1080,9 @@ else
   }
 
   private static string Text(JsonElement root, string property) =>
-    root.TryGetProperty(property, out var value) ? value.GetString() ?? "" : "";
+    root.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+      ? value.GetString() ?? ""
+      : "";
 
   private static bool HasValue(JsonElement root, string property) =>
     root.TryGetProperty(property, out var value) &&

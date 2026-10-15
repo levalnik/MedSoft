@@ -21,7 +21,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 
 public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClassFixture<HospitalApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = factory.CreateBusinessClient();
 
     [Fact]
     public async Task Import_creates_updates_and_repeats_without_changing_ids_or_timestamps()
@@ -137,7 +137,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
         await using var observedFactory = factory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
                 services.AddDbContext<HospitalDbContext>(options => options.AddInterceptors(reads))));
-        using var client = observedFactory.CreateClient();
+        using var client = observedFactory.CreateBusinessClient();
         reads.Reset();
 
         var response =
@@ -159,7 +159,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
         await using var observedFactory = factory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
                 services.AddDbContext<HospitalDbContext>(options => options.AddInterceptors(reads))));
-        using var client = observedFactory.CreateClient();
+        using var client = observedFactory.CreateBusinessClient();
         reads.WaitForPair();
 
         var responses = await Task.WhenAll(

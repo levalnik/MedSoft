@@ -182,6 +182,65 @@ public sealed class MedicalRecordSnapshotTests
         snapshot.Should().Throw<InvalidOperationException>().WithMessage("*последовательность версий*");
     }
 
+    [Theory]
+    [InlineData("{")]
+    [InlineData("null")]
+    [InlineData("{}")]
+    public void Historical_snapshot_rejects_corrupted_payload_in_later_history(string payload)
+    {
+        var (record, _, _, _) = Scenario();
+        var history = record.HistoryEvents.Select(item => item.Version == 3
+            ? ReplaceEvent(item, payload: payload)
+            : item);
+
+        var snapshot = () => MedicalRecordSnapshotReplay.Build(record, history, T1);
+
+        snapshot.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Historical_snapshot_rejects_unknown_type_in_later_history()
+    {
+        var (record, _, _, _) = Scenario();
+        var history = record.HistoryEvents.Select(item => item.Version == 3
+            ? ReplaceEvent(item, type: (MedicalRecordEventType)999)
+            : item);
+
+        var snapshot = () => MedicalRecordSnapshotReplay.Build(record, history, T1);
+
+        snapshot.Should().Throw<InvalidOperationException>().WithMessage("*неизвестный тип*");
+    }
+
+    [Fact]
+    public void Historical_snapshot_rejects_invalid_state_transition_in_later_history()
+    {
+        var (record, _, _, _) = Scenario();
+        var history = record.HistoryEvents.Select(item => item.Version == 3
+            ? ReplaceEvent(item, type: MedicalRecordEventType.PrescriptionCancelled)
+            : item);
+
+        var snapshot = () => MedicalRecordSnapshotReplay.Build(record, history, T1);
+
+        snapshot.Should().Throw<InvalidOperationException>().WithMessage("*отмена отсутствующего*");
+    }
+
+    [Fact]
+    public void Replay_rejects_two_replacements_of_the_same_prescription()
+    {
+        var author = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", T0);
+        var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, T0);
+        var original = MedicalRecordService.AddPrescription(record, "Исходное назначение", author, T1);
+        MedicalRecordService.ReplacePrescription(record, original.Id, "Новое назначение", author, T2);
+        var duplicateId = Guid.NewGuid();
+        var duplicate = MedicalRecordHistoryEventFactory.Create(record.Id, ++record.Version,
+            MedicalRecordEventType.PrescriptionAdded, duplicateId,
+            new PrescriptionAddedPayload(duplicateId, "Повторная замена", original.Id), author, T3);
+
+        var snapshot = () => MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.Append(duplicate), T3);
+
+        snapshot.Should().Throw<InvalidOperationException>().WithMessage("*уже заменено*");
+    }
+
     [Fact]
     public async Task Builder_returns_not_found_for_missing_record()
     {

@@ -1,5 +1,6 @@
 @page "/medical/patients/new"
 @page "/medical/patients/{Id:guid}"
+@attribute [Authorize(Roles = ApplicationRoles.MedicalWorker)]
 @using HospitalInformationSystem.Contracts.Patients
 @implements IDisposable
 @inject PatientsApiClient Api
@@ -76,7 +77,7 @@ else if (_model is not null)
             </div>
             <div class="form-grid">
               <div><label for="birthDate">Дата рождения</label>
-                <InputDate id="birthDate" class="form-control" @bind-Value="_model.BirthDate" max="@_today"/>
+                <InputDate id="birthDate" class="form-control" @bind-Value="_model.BirthDate" max="@Today"/>
                 <ValidationMessage For="() => _model.BirthDate"/>
               </div>
               <div><label for="sex">Пол</label>
@@ -149,7 +150,7 @@ else
   private CancellationTokenSource? _routeCancellation;
   private Guid? _loadedId;
 
-  private static readonly string _today = DateTime.Today.ToString("yyyy-MM-dd");
+  private static string Today => DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
   protected override async Task OnParametersSetAsync()
   {

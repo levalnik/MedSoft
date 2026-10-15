@@ -1,12 +1,16 @@
 using HospitalInformationSystem.Application.Abstractions;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Infrastructure.Persistence.Models;
+using HospitalInformationSystem.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace HospitalInformationSystem.Infrastructure.Contexts;
 
-public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> options) : DbContext(options), IUnitOfWork
+public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> options)
+    : IdentityDbContext<HospitalUser, IdentityRole<Guid>, Guid>(options), IUnitOfWork
 {
     public DbSet<MedicalWorkerDbo> MedicalWorkers => Set<MedicalWorkerDbo>();
     public DbSet<PatientDbo> Patients => Set<PatientDbo>();
@@ -16,12 +20,22 @@ public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> option
     public DbSet<PrescriptionDbo> Prescriptions => Set<PrescriptionDbo>();
     public DbSet<MedicalRecordHistoryEventDbo> MedicalRecordHistoryEvents => Set<MedicalRecordHistoryEventDbo>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(HospitalDbContext).Assembly);
+        modelBuilder.Entity<HospitalUser>(user =>
+        {
+            user.HasIndex(x => x.MedicalWorkerId).IsUnique();
+            user.HasOne<MedicalWorkerDbo>().WithMany().HasForeignKey(x => x.MedicalWorkerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
 
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
+        RejectHistoryChanges();
         try
         {
             return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
@@ -31,16 +45,46 @@ public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> option
             throw new BusinessConflictException(
                 "Данные уже изменены другим запросом. Обновите страницу и повторите операцию.", exception);
         }
-        catch (Exception exception) when (exception.GetBaseException() is PostgresException postgres &&
-                                          postgres.SqlState is PostgresErrorCodes.UniqueViolation
-                                              or PostgresErrorCodes.ForeignKeyViolation
-                                              or PostgresErrorCodes.CheckViolation
-                                              or PostgresErrorCodes.SerializationFailure
-                                              or PostgresErrorCodes.DeadlockDetected)
+        catch (Exception exception) when (IsDatabaseConflict(exception))
         {
             throw new BusinessConflictException(
                 "Сохранение конфликтует с существующей записью, связями или одновременным изменением. Обновите данные и повторите операцию.",
                 exception);
         }
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RejectHistoryChanges();
+        try
+        {
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new BusinessConflictException(
+                "Данные уже изменены другим запросом. Обновите страницу и повторите операцию.", exception);
+        }
+        catch (Exception exception) when (IsDatabaseConflict(exception))
+        {
+            throw new BusinessConflictException(
+                "Сохранение конфликтует с существующей записью, связями или одновременным изменением. Обновите данные и повторите операцию.",
+                exception);
+        }
+    }
+
+    private static bool IsDatabaseConflict(Exception exception) =>
+        exception.GetBaseException() is PostgresException postgres &&
+        postgres.SqlState is PostgresErrorCodes.UniqueViolation
+            or PostgresErrorCodes.ForeignKeyViolation
+            or PostgresErrorCodes.CheckViolation
+            or PostgresErrorCodes.SerializationFailure
+            or PostgresErrorCodes.DeadlockDetected;
+
+    private void RejectHistoryChanges()
+    {
+        if (ChangeTracker.Entries<MedicalRecordHistoryEventDbo>()
+            .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Сохранённые события истории нельзя изменять или удалять.");
     }
 }

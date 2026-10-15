@@ -1,6 +1,10 @@
 @page "/"
+@attribute [Authorize]
 @inject NavigationManager Navigation
+@inject SessionState Session
 
 @code {
-    protected override void OnInitialized() => Navigation.NavigateTo("/admin/medical-workers", replace: true);
+    protected override void OnInitialized() => Navigation.NavigateTo(
+      Session.Current?.Role == ApplicationRoles.Administrator ? "/admin/medical-workers" : "/medical/patients",
+      replace: true);
 }

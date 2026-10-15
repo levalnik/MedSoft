@@ -19,6 +19,7 @@ public sealed class DiagnosisDefinitionConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(24).IsRequired();
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc");
+        builder.Property<uint>("xmin").IsRowVersion();
         builder.HasIndex(x => x.Code).IsUnique().HasDatabaseName("ux_diagnosis_definitions_code");
         builder.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ux_diagnosis_definitions_name");
     }

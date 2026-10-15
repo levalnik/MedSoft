@@ -4,12 +4,15 @@ using HospitalInformationSystem.Application.MedicalWorkers.Commands.UpdateMedica
 using HospitalInformationSystem.Application.MedicalWorkers.Queries.GetMedicalWorker;
 using HospitalInformationSystem.Application.MedicalWorkers.Queries.GetMedicalWorkers;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
+using HospitalInformationSystem.Api.Security;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HospitalInformationSystem.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = ApiSecurityPolicies.CatalogRead)]
 [Route("api/medical-workers")]
 public sealed class MedicalWorkersController(ISender sender) : ControllerBase
 {
@@ -23,6 +26,7 @@ public sealed class MedicalWorkersController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetMedicalWorkerQuery(id), cancellationToken));
 
     [HttpPost]
+    [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     [ProducesResponseType<MedicalWorkerDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<MedicalWorkerDto>> CreateAsync(SaveMedicalWorkerRequest request,
         CancellationToken cancellationToken)
@@ -34,12 +38,14 @@ public sealed class MedicalWorkersController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     public async Task<ActionResult<MedicalWorkerDto>> UpdateAsync(Guid id, SaveMedicalWorkerRequest request,
         CancellationToken cancellationToken) =>
         Ok(await sender.Send(new UpdateMedicalWorkerCommand(id, request.FirstName, request.LastName, request.Position),
             cancellationToken));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
