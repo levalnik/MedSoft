@@ -1,5 +1,6 @@
 @page "/admin/medical-workers/new"
 @page "/admin/medical-workers/{Id:guid}"
+@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @implements IDisposable
 @inject MedicalWorkersApiClient Api
 @inject NavigationManager Navigation

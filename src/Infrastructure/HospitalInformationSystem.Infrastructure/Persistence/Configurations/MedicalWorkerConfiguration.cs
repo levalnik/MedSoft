@@ -23,5 +23,6 @@ public sealed class MedicalWorkerConfiguration : IEntityTypeConfiguration<Medica
         builder.Property(x => x.IsDeleted).HasColumnName("is_deleted");
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc");
+        builder.Property<uint>("xmin").IsRowVersion();
     }
 }

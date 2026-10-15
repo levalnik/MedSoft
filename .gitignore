@@ -7,6 +7,17 @@
 TestResults/
 artifacts/
 .env
+.env.*
+!.env.example
+**/appsettings.Local.json
+*.user
+*.suo
+*.log
+*.pfx
+*.p12
+*.key
+**/__pycache__/
+*.pyc
 
 # Markdown documentation is kept locally in docs/
 *.md

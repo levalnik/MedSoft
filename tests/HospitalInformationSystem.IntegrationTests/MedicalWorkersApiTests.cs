@@ -18,7 +18,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 
 public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassFixture<HospitalApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = factory.CreateBusinessClient();
 
     [Fact]
     public async Task Create_update_delete_preserves_row_and_filters_default_list()

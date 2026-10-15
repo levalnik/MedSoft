@@ -8,10 +8,13 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using HospitalInformationSystem.Application.Diagnoses.Commands.ImportDiagnoses;
+using HospitalInformationSystem.Api.Security;
+using Microsoft.AspNetCore.Authorization;
 
 namespace HospitalInformationSystem.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = ApiSecurityPolicies.CatalogRead)]
 [Route("api/diagnoses")]
 public sealed class DiagnosesController(ISender sender) : ControllerBase
 {
@@ -25,6 +28,7 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetDiagnosisQuery(id), cancellationToken));
 
     [HttpPost]
+    [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     [ProducesResponseType<DiagnosisDefinitionDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<DiagnosisDefinitionDto>> CreateAsync(SaveDiagnosisRequest request,
         CancellationToken cancellationToken)
@@ -34,11 +38,13 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     public async Task<ActionResult<DiagnosisDefinitionDto>> UpdateAsync(Guid id, SaveDiagnosisRequest request,
         CancellationToken cancellationToken) =>
         Ok(await sender.Send(new UpdateDiagnosisCommand(id, request.Code, request.Name), cancellationToken));
 
     [HttpPost("import")]
+    [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(DiagnosisImportLimits.MaxFileBytes + 64 * 1024)]
     [ProducesResponseType<DiagnosisImportResultDto>(StatusCodes.Status200OK)]
@@ -69,6 +75,7 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {

@@ -35,6 +35,7 @@ public sealed class MedicalRecordsApiFactory : WebApplicationFactory<Program>, I
         builder.UseSetting("ConnectionStrings:Postgres", _postgres.GetConnectionString());
         builder.UseSetting("Database:ApplyMigrations", "true");
         builder.UseSetting("Database:Seed", "false");
+        builder.AddBusinessTestAuthentication();
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<TimeProvider>();
@@ -44,6 +45,8 @@ public sealed class MedicalRecordsApiFactory : WebApplicationFactory<Program>, I
     }
 
     public Task InitializeAsync() => _postgres.StartAsync();
+
+
 
     async Task IAsyncLifetime.DisposeAsync()
     {

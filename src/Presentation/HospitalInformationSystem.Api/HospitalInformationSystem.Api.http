@@ -1,7 +1,35 @@
 @baseUrl = http://localhost:5200
+@adminUserName = admin
+@adminPassword = {{$processEnv MEDSOFT_ADMIN_PASSWORD}}
+@workerId = 00000000-0000-0000-0000-000000000000
+
+# Выполняйте запросы по порядку в VS Code REST Client с включённым cookie jar.
+# MEDSOFT_ADMIN_PASSWORD задайте локально в окружении REST Client. Не записывайте пароль в этот файл.
+# Сгенерированный пароль admin находится в игнорируемом appsettings.Local.json.
 
 ### Проверка подключения к БД
 GET {{baseUrl}}/health/ready
+
+### Получить анонимный CSRF-токен и cookie
+# @name anonymousCsrf
+GET {{baseUrl}}/api/auth/csrf
+
+### Войти как администратор; клиент должен сохранить cookie из ответа
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+X-CSRF-TOKEN: {{anonymousCsrf.response.body.$.requestToken}}
+
+{
+  "userName": "{{adminUserName}}",
+  "password": "{{adminPassword}}"
+}
+
+### После входа получить новый CSRF-токен, связанный с администратором
+# @name adminCsrf
+GET {{baseUrl}}/api/auth/csrf
+
+### Проверить текущую учётную запись и роль
+GET {{baseUrl}}/api/auth/session
 
 ### Список включая удалённых
 GET {{baseUrl}}/api/medical-workers?includeDeleted=true
@@ -9,6 +37,7 @@ GET {{baseUrl}}/api/medical-workers?includeDeleted=true
 ### Создать; скопировать id ответа в workerId ниже
 POST {{baseUrl}}/api/medical-workers
 Content-Type: application/json
+X-CSRF-TOKEN: {{adminCsrf.response.body.$.requestToken}}
 
 {
   "firstName": "Александр",
@@ -17,12 +46,12 @@ Content-Type: application/json
 }
 
 ### Подставьте id созданной записи
-@workerId = 00000000-0000-0000-0000-000000000000
 GET {{baseUrl}}/api/medical-workers/{{workerId}}
 
 ### Изменить
 PUT {{baseUrl}}/api/medical-workers/{{workerId}}
 Content-Type: application/json
+X-CSRF-TOKEN: {{adminCsrf.response.body.$.requestToken}}
 
 {
   "firstName": "Александр",
@@ -30,11 +59,20 @@ Content-Type: application/json
   "position": "Врач-хирург"
 }
 
-### Пометить удалённым
+### Пометить удалённым; связанная учётная запись медработника потеряет доступ
 DELETE {{baseUrl}}/api/medical-workers/{{workerId}}
+X-CSRF-TOKEN: {{adminCsrf.response.body.$.requestToken}}
 
 ### 400 ValidationProblemDetails
 POST {{baseUrl}}/api/medical-workers
 Content-Type: application/json
+X-CSRF-TOKEN: {{adminCsrf.response.body.$.requestToken}}
 
 { "firstName": "А", "lastName": "Орлов", "position": "Врач" }
+
+### Учётные записи создаются администратором через /admin/accounts в веб-интерфейсе
+GET {{baseUrl}}/api/accounts
+
+### Завершить сеанс; перед следующим входом снова получить анонимный CSRF-токен
+POST {{baseUrl}}/api/auth/logout
+X-CSRF-TOKEN: {{adminCsrf.response.body.$.requestToken}}

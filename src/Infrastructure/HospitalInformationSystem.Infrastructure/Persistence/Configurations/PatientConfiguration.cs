@@ -27,5 +27,6 @@ public sealed class PatientConfiguration : IEntityTypeConfiguration<PatientDbo>
         builder.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(32);
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc");
+        builder.Property<uint>("xmin").IsRowVersion();
     }
 }

@@ -16,7 +16,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 
 public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : IClassFixture<HospitalApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = factory.CreateBusinessClient();
 
     [Fact]
     public async Task Patient_update_is_persisted_and_patient_without_record_is_physically_deleted()

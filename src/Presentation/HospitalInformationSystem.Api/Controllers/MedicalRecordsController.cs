@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using HospitalInformationSystem.Application.MedicalRecords.Commands.AddMedicalRecordDiagnosis;
 using HospitalInformationSystem.Application.MedicalRecords.Commands.AddPrescription;
@@ -12,12 +13,16 @@ using HospitalInformationSystem.Application.MedicalRecords.Queries.GetMedicalRec
 using HospitalInformationSystem.Application.MedicalRecords.Queries.GetPatientMedicalRecord;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Domain.Common;
+using HospitalInformationSystem.Api.Security;
+using HospitalInformationSystem.Contracts.Auth;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HospitalInformationSystem.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = ApiSecurityPolicies.Clinical)]
 [Route("api/medical-records")]
 public sealed partial class MedicalRecordsController(ISender sender) : ControllerBase
 {
@@ -102,6 +107,9 @@ public sealed partial class MedicalRecordsController(ISender sender) : Controlle
         var values = Request.Headers["X-Medical-Worker-Id"];
         if (values.Count != 1 || !Guid.TryParse(values[0], out var id) || id == Guid.Empty)
             throw new DomainValidationException("Укажите один корректный X-Medical-Worker-Id.");
+        if (!Guid.TryParse(User.FindFirstValue(AuthClaimTypes.MedicalWorkerId), out var authenticatedAuthorId) ||
+            authenticatedAuthorId != id)
+            throw new ForbiddenOperationException();
         return id;
     }
 

@@ -1,4 +1,5 @@
 @page "/admin/medical-workers"
+@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @implements IDisposable
 @inject MedicalWorkersApiClient Api
 
@@ -154,30 +155,33 @@
 
       _workers = workers;
     }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
     catch (ApiException e)
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _error = e.Message;
       }
     }
     catch (HttpRequestException)
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _error = "Сервер недоступен. Проверьте, запущено ли приложение API.";
       }
     }
     catch (TaskCanceledException)
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _error = "Сервер не ответил вовремя. Повторите попытку.";
       }
     }
     finally
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _loading = false;
       }
@@ -200,9 +204,17 @@
     {
       var deletedId = _pendingDelete.Id;
       await Api.DeleteAsync(deletedId, token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
       _workers = _workers?.Select(worker => worker.Id == deletedId ? worker with { IsDeleted = true } : worker).ToArray();
       _pendingDelete = null;
       await LoadAsync();
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
     }
     catch (ApiException e)
     {

@@ -21,13 +21,16 @@ public static class MedicalRecordSnapshotReplay
         var diagnosisIds = new HashSet<Guid>();
         var prescriptionIds = new HashSet<Guid>();
         var cancelledPrescriptionIds = new HashSet<Guid>();
+        var replacedPrescriptionIds = new HashSet<Guid>();
         var completeHistory = historyEvents.OrderBy(x => x.Version).ToArray();
-        var events = completeHistory.Where(x => x.OccurredAtUtc <= at);
+        MedicalRecordSnapshotDto? snapshot = null;
         var version = 0L;
         var previousTime = record.CreatedAtUtc;
 
-        foreach (var item in events)
+        foreach (var item in completeHistory)
         {
+            if (item.OccurredAtUtc > at && snapshot is null)
+                snapshot = Capture();
             Require(item.MedicalRecordId == record.Id, "событие принадлежит другой карте");
             Require(item.Version == version + 1, "нарушена последовательность версий");
             Require(item.OccurredAtUtc >= previousTime, "время события меньше времени предыдущего");
@@ -79,8 +82,9 @@ public static class MedicalRecordSnapshotReplay
                     Require(prescriptionIds.Add(payload.PrescriptionId), "повторное добавление того же назначения");
                     Require(
                         payload.ReplacesPrescriptionId is null ||
-                        cancelledPrescriptionIds.Contains(payload.ReplacesPrescriptionId.Value),
-                        "заменяемое назначение не было отменено");
+                        (cancelledPrescriptionIds.Contains(payload.ReplacesPrescriptionId.Value) &&
+                         replacedPrescriptionIds.Add(payload.ReplacesPrescriptionId.Value)),
+                        "заменяемое назначение не было отменено или уже заменено");
                     prescriptions.Add(payload.PrescriptionId, new PrescriptionDto(payload.PrescriptionId, payload.Text,
                         item.OccurredAtUtc, item.PerformedByMedicalWorkerId, payload.ReplacesPrescriptionId));
                     break;
@@ -105,25 +109,11 @@ public static class MedicalRecordSnapshotReplay
         }
 
         Require(version > 0, "отсутствует событие создания карты");
-        ValidateCompleteHistory(record, completeHistory);
-        return new MedicalRecordSnapshotDto(record.Id, record.PatientId, at, version,
-            diagnoses.Values.ToArray(), prescriptions.Values.ToArray());
-    }
-
-    private static void ValidateCompleteHistory(MedicalRecord record, IReadOnlyList<MedicalRecordHistoryEvent> history)
-    {
-        var version = 0L;
-        var previousTime = record.CreatedAtUtc;
-        foreach (var item in history)
-        {
-            Require(item.MedicalRecordId == record.Id, "событие принадлежит другой карте");
-            Require(item.Version == version + 1, "нарушена последовательность версий");
-            Require(item.OccurredAtUtc >= previousTime, "время события меньше времени предыдущего");
-            version = item.Version;
-            previousTime = item.OccurredAtUtc;
-        }
-
         Require(version == record.Version, "последняя версия истории не совпадает с версией карты");
+        return snapshot ?? Capture();
+
+        MedicalRecordSnapshotDto Capture() => new(record.Id, record.PatientId, at, version,
+            diagnoses.Values.ToArray(), prescriptions.Values.ToArray());
     }
 
     private static T Read<T>(MedicalRecordHistoryEvent item) where T : class

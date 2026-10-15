@@ -20,7 +20,10 @@ public sealed class HospitalApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("ConnectionStrings:Postgres", _postgres.GetConnectionString());
         builder.UseSetting("Database:ApplyMigrations", "true");
         builder.UseSetting("Database:Seed", "true");
+        builder.AddBusinessTestAuthentication();
     }
+
+
 
     public Task InitializeAsync() => _postgres.StartAsync();
 

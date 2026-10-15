@@ -20,7 +20,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 
 public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClassFixture<HospitalApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = factory.CreateBusinessClient();
 
     [Theory]
     [InlineData("medical-workers", "firstName")]

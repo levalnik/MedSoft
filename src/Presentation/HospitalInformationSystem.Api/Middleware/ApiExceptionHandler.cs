@@ -1,6 +1,7 @@
 using FluentValidation;
 using HospitalInformationSystem.Application.Common;
 using HospitalInformationSystem.Domain.Common;
+using HospitalInformationSystem.Api.Security;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -28,6 +29,8 @@ public sealed class ApiExceptionHandler(
             {
                 Status = badRequest.StatusCode, Title = "Некорректный HTTP-запрос."
             },
+            ForbiddenOperationException => new ProblemDetails
+                { Status = 403, Title = "Недостаточно прав для выполнения операции." },
             EntityNotFoundException => new ProblemDetails
                 { Status = 404, Title = "Запись не найдена.", Detail = exception.Message },
             DomainEntityNotFoundException => new ProblemDetails
@@ -39,7 +42,8 @@ public sealed class ApiExceptionHandler(
             _ => new ProblemDetails { Status = 500, Title = "Не удалось выполнить запрос." }
         };
         if (problem.Status == 500)
-            logger.LogError(exception, "Unexpected error processing {Path}", context.Request.Path);
+            logger.LogError("Unexpected {ExceptionType} processing {Method}; trace {TraceId}; stack {StackTrace}",
+                exception.GetType().FullName, context.Request.Method, context.TraceIdentifier, exception.StackTrace);
         context.Response.StatusCode = problem.Status!.Value;
         problem.Instance = context.Request.Path;
         problem.Extensions["traceId"] = context.TraceIdentifier;

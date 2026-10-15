@@ -4,12 +4,15 @@ using HospitalInformationSystem.Application.Patients.Commands.DeletePatient;
 using HospitalInformationSystem.Application.Patients.Queries.GetPatient;
 using HospitalInformationSystem.Application.Patients.Queries.GetPatients;
 using HospitalInformationSystem.Contracts.Patients;
+using HospitalInformationSystem.Api.Security;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HospitalInformationSystem.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = ApiSecurityPolicies.Clinical)]
 [Route("api/patients")]
 public sealed class PatientsController(ISender sender) : ControllerBase
 {

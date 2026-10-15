@@ -1,4 +1,5 @@
 @page "/admin/diagnoses"
+@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @using HospitalInformationSystem.Contracts.Diagnoses
 @implements IDisposable
 @inject DiagnosesApiClient Api
@@ -8,7 +9,7 @@
 <div class="page-heading">
   <div><h1>Справочник диагнозов</h1>
     <p>Коды и наименования для электронных медицинских карт.</p></div>
-  <button class="btn btn-primary" disabled="@(_saving || _deleting)" @onclick="BeginCreate">
+  <button class="btn btn-primary" disabled="@IsMutating" @onclick="BeginCreate">
     <Icon Name="plus"/>
     Добавить диагноз</button>
 </div>
@@ -28,9 +29,9 @@
     <div class="import-controls">
       <div><label for="diagnosis-csv">CSV-файл</label>
         <InputFile id="diagnosis-csv" class="form-control" accept=".csv,text/csv" OnChange="SelectFile"
-                   disabled="@_importing" aria-describedby="csv-help"/>
+                   disabled="@IsMutating" aria-describedby="csv-help"/>
       </div>
-      <button class="btn btn-primary" disabled="@(_file is null || _importing || _loading)"
+      <button class="btn btn-primary" disabled="@(_file is null || IsMutating || _loading)"
               @onclick="ImportAsync">@(_importing ? "Импортируем…" : "Импортировать")</button>
       <a href="examples/diagnoses.csv" download="diagnoses.csv">Скачать пример</a>
     </div>
@@ -55,7 +56,7 @@
     </div>
     <EditForm Model="_form" OnValidSubmit="SaveAsync">
       <DataAnnotationsValidator/>
-      <fieldset disabled="@_saving">
+      <fieldset disabled="@IsMutating">
         <div class="form-grid">
           <div>
             <label for="diagnosis-code">Код</label>
@@ -72,7 +73,7 @@
         </div>
         <ErrorAlert Message="@_formError"/>
         <div class="form-actions">
-          <button type="button" class="btn btn-light" disabled="@_saving" @onclick="CancelForm">Отмена</button>
+          <button type="button" class="btn btn-light" disabled="@IsMutating" @onclick="CancelForm">Отмена</button>
           <button type="submit" class="btn btn-primary">
             <Icon Name="check"/> @(_saving ? "Сохранение…" : "Сохранить")
           </button>
@@ -91,10 +92,10 @@
     </div>
     <ErrorAlert Message="@_deleteError"/>
     <div class="button-row">
-      <button class="btn btn-danger" disabled="@_deleting" @onclick="DeleteAsync">
+      <button class="btn btn-danger" disabled="@IsMutating" @onclick="DeleteAsync">
         @(_deleting ? "Удаление…" : "Удалить")
       </button>
-      <button class="btn btn-light" disabled="@_deleting" @onclick="CancelDelete">Отмена</button>
+      <button class="btn btn-light" disabled="@IsMutating" @onclick="CancelDelete">Отмена</button>
     </div>
   </div>
 }
@@ -138,11 +139,11 @@
             <td data-label="Код"><code>@diagnosis.Code</code></td>
             <td data-label="Наименование">@diagnosis.Name</td>
             <td class="actions-cell">
-              <button class="icon-button" title="Редактировать диагноз" disabled="@(_saving || _deleting)"
+              <button class="icon-button" title="Редактировать диагноз" disabled="@IsMutating"
                       aria-label="Редактировать: @diagnosis.Code @diagnosis.Name" @onclick="() => BeginEdit(diagnosis)">
                 <Icon Name="edit"/>
               </button>
-              <button class="icon-button danger" title="Удалить диагноз" disabled="@(_saving || _deleting)"
+              <button class="icon-button danger" title="Удалить диагноз" disabled="@IsMutating"
                       aria-label="Удалить: @diagnosis.Code @diagnosis.Name" @onclick="() => AskDelete(diagnosis)">
                 <Icon Name="delete"/>
               </button>
@@ -172,7 +173,7 @@
   private bool _loading = true;
   private bool _importing;
 
-  private readonly DiagnosisForm _form = new();
+  private DiagnosisForm _form = new();
   private Guid? _editingId;
   private bool _formOpen;
   private bool _saving;
@@ -183,6 +184,7 @@
   private CancellationTokenSource? _cts;
   private int _loadVersion;
   private bool _disposed;
+  private bool IsMutating => _saving || _deleting || _importing;
 
   private IEnumerable<DiagnosisDefinitionDto> VisibleDiagnoses => (_diagnoses ?? [])
     .Where(x => $"{x.Code} {x.Name}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -195,28 +197,26 @@
 
   private void BeginCreate()
   {
-    if (_saving || _deleting)
+    if (IsMutating || _disposed)
     {
       return;
     }
 
     _editingId = null;
-    _form.Code = "";
-    _form.Name = "";
+    _form = new DiagnosisForm();
     _formError = null;
     _formOpen = true;
   }
 
   private void BeginEdit(DiagnosisDefinitionDto diagnosis)
   {
-    if (_saving || _deleting)
+    if (IsMutating || _disposed)
     {
       return;
     }
 
     _editingId = diagnosis.Id;
-    _form.Code = diagnosis.Code;
-    _form.Name = diagnosis.Name;
+    _form = new DiagnosisForm { Code = diagnosis.Code, Name = diagnosis.Name };
     _formError = null;
     _formOpen = true;
   }
@@ -229,7 +229,7 @@
 
   private void AskDelete(DiagnosisDefinitionDto diagnosis)
   {
-    if (_saving || _deleting)
+    if (IsMutating || _disposed)
     {
       return;
     }
@@ -246,7 +246,7 @@
 
   private async Task SaveAsync()
   {
-    if (_saving || _cts is null)
+    if (IsMutating || _cts is null || _disposed)
     {
       return;
     }
@@ -257,17 +257,27 @@
     try
     {
       var request = new SaveDiagnosisRequest(_form.Code.Trim(), _form.Name.Trim());
+      DiagnosisDefinitionDto saved;
       if (_editingId is { } id)
       {
-        await Api.UpdateAsync(id, request, token);
+        saved = await Api.UpdateAsync(id, request, token);
       }
       else
       {
-        await Api.CreateAsync(request, token);
+        saved = await Api.CreateAsync(request, token);
       }
 
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      _diagnoses = (_diagnoses ?? []).Where(diagnosis => diagnosis.Id != saved.Id).Append(saved).ToArray();
       _formOpen = false;
       await LoadAsync();
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
     }
     catch (ApiException e)
     {
@@ -289,7 +299,7 @@
 
   private async Task DeleteAsync()
   {
-    if (_pendingDelete is null || _deleting || _cts is null)
+    if (_pendingDelete is null || IsMutating || _cts is null || _disposed)
     {
       return;
     }
@@ -299,9 +309,19 @@
     _deleteError = null;
     try
     {
-      await Api.DeleteAsync(_pendingDelete.Id, token);
+      var deletedId = _pendingDelete.Id;
+      await Api.DeleteAsync(deletedId, token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      _diagnoses = _diagnoses?.Where(diagnosis => diagnosis.Id != deletedId).ToArray();
       _pendingDelete = null;
       await LoadAsync();
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
     }
     catch (ApiException e)
     {
@@ -342,7 +362,7 @@
 
   private async Task ImportAsync()
   {
-    if (_file is null || _importing || _loading || _cts is null)
+    if (_file is null || IsMutating || _loading || _cts is null || _disposed)
     {
       return;
     }
@@ -353,9 +373,12 @@
     _result = null;
     try
     {
-      await using var stream = _file.OpenReadStream(DiagnosisImportLimits.MaxFileBytes);
+      await using var stream = _file.OpenReadStream(DiagnosisImportLimits.MaxFileBytes, token);
       _result = await Api.ImportAsync(stream, _file.Name, token);
       await LoadAsync();
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
     }
     catch (ApiException e)
     {
@@ -400,30 +423,33 @@
 
       _diagnoses = diagnoses;
     }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
     catch (ApiException e)
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _listError = e.Message;
       }
     }
     catch (HttpRequestException)
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _listError = "Не удалось обновить список: сервер недоступен.";
       }
     }
     catch (TaskCanceledException)
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _listError = "Не удалось обновить список: сервер не ответил вовремя.";
       }
     }
     finally
     {
-      if (version == _loadVersion)
+      if (IsCurrent(token) && version == _loadVersion)
       {
         _loading = false;
       }

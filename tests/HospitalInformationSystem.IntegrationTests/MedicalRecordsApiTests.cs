@@ -20,7 +20,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     : IClassFixture<MedicalRecordsApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = factory.CreateBusinessClient();
     private static readonly DateTimeOffset T0 = new(2026, 10, 4, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]

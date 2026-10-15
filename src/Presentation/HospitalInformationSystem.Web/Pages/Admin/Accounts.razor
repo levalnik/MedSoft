@@ -1,0 +1,266 @@
+@page "/admin/accounts"
+@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
+@implements IDisposable
+@inject AccountsApiClient Api
+@inject MedicalWorkersApiClient WorkersApi
+
+<PageTitle>Учётные записи · Учебная HIS</PageTitle>
+<div class="page-heading">
+  <div><h1>Учётные записи</h1><p>Доступ к системе и связь с медработниками.</p></div>
+</div>
+<section class="surface" aria-labelledby="account-create-title">
+  <div class="registry-heading">
+    <div><h2 id="account-create-title">Новая учётная запись</h2>
+      <p>Администратор управляет справочниками, медработник — пациентами и ЭМК.</p></div>
+  </div>
+  <EditForm Model="_form" OnValidSubmit="CreateAsync">
+    <DataAnnotationsValidator/>
+    <fieldset disabled="@(_saving || _loading || _workers is null)">
+      <div class="form-grid">
+        <div>
+          <label for="account-name">Логин</label>
+          <InputText id="account-name" class="form-control" @bind-Value="_form.UserName" maxlength="64"
+                     autocomplete="off"/>
+          <ValidationMessage For="() => _form.UserName"/>
+        </div>
+        <div>
+          <label for="account-password">Пароль</label>
+          <InputText id="account-password" type="password" class="form-control" @bind-Value="_form.Password"
+                     maxlength="128" autocomplete="new-password" aria-describedby="password-help"/>
+          <ValidationMessage For="() => _form.Password"/>
+        </div>
+        <div>
+          <label for="account-role">Роль</label>
+          <InputSelect id="account-role" class="form-control" @bind-Value="_form.Role">
+            <option value="@ApplicationRoles.MedicalWorker">Медработник</option>
+            <option value="@ApplicationRoles.Administrator">Администратор</option>
+          </InputSelect>
+          <ValidationMessage For="() => _form.Role"/>
+        </div>
+        @if (_form.Role == ApplicationRoles.MedicalWorker)
+        {
+          <div>
+            <label for="account-worker">Медработник</label>
+            <InputSelect id="account-worker" class="form-control" @bind-Value="_form.MedicalWorkerId">
+              <option value="">— выберите медработника —</option>
+              @foreach (var worker in (_workers ?? []).Where(worker => !worker.IsDeleted))
+              {
+                <option value="@worker.Id">@worker.LastName @worker.FirstName — @worker.Position</option>
+              }
+            </InputSelect>
+            <ValidationMessage For="() => _form.MedicalWorkerId"/>
+          </div>
+        }
+      </div>
+      <p id="password-help" class="field-hint">Пароль: 12–128 символов, строчные и прописные латинские буквы,
+        цифра и специальный символ. Логин: 3–64 символа, латинские буквы, цифры и знаки <code>._-@@+</code>.</p>
+      <ErrorAlert Message="@_formError"/>
+      @if (_notice is not null)
+      {
+        <p role="status">@_notice</p>
+      }
+      <button type="submit" class="btn btn-primary">@(_saving ? "Создание…" : "Создать учётную запись")</button>
+    </fieldset>
+  </EditForm>
+</section>
+
+<ErrorAlert Message="@_listError"/>
+<section class="surface" aria-labelledby="accounts-title">
+  <div class="registry-heading">
+    <div><h2 id="accounts-title">Пользователи системы</h2><p>Права доступа определяются назначенной ролью.</p></div>
+    <button class="btn btn-outline-primary" disabled="@(_loading || _saving)" @onclick="LoadAsync">Обновить</button>
+  </div>
+  @if (_loading)
+  {
+    <div class="empty-state" role="status">Загрузка учётных записей…</div>
+  }
+  else if (_accounts is not null)
+  {
+    <div class="table-responsive">
+      <table class="table mr-table">
+        <thead><tr><th scope="col">Логин</th><th scope="col">Роль</th><th scope="col">Медработник</th><th scope="col">Статус</th></tr></thead>
+        <tbody>
+        @foreach (var account in _accounts)
+        {
+          <tr @key="account.Id">
+            <td data-label="Логин">@account.UserName</td>
+            <td data-label="Роль">@(account.Role == ApplicationRoles.Administrator ? "Администратор" : "Медработник")</td>
+            <td data-label="Медработник">@WorkerName(account.MedicalWorkerId)</td>
+            <td data-label="Статус">@AccountStatus(account)</td>
+          </tr>
+        }
+        </tbody>
+      </table>
+    </div>
+    @if (_accounts.Count == 0)
+    {
+      <div class="empty-state">Учётные записи не найдены.</div>
+    }
+  }
+  else
+  {
+    <div class="empty-state">Не удалось загрузить учётные записи. Повторите загрузку.</div>
+  }
+</section>
+
+@code {
+  private AccountForm _form = new();
+  private IReadOnlyList<AccountDto>? _accounts;
+  private IReadOnlyList<MedicalWorkerDto>? _workers;
+  private readonly CancellationTokenSource _cancellation = new();
+  private bool _loading;
+  private bool _saving;
+  private int _loadVersion;
+  private string? _formError;
+  private string? _listError;
+  private string? _notice;
+
+  protected override Task OnInitializedAsync() => LoadAsync();
+
+  private async Task LoadAsync()
+  {
+    var version = ++_loadVersion;
+    _loading = true;
+    _listError = null;
+    try
+    {
+      var accounts = await Api.ListAsync(_cancellation.Token);
+      var workers = await WorkersApi.ListAsync(includeDeleted: true, _cancellation.Token);
+      if (!_cancellation.IsCancellationRequested && version == _loadVersion)
+      {
+        _accounts = accounts;
+        _workers = workers;
+      }
+    }
+    catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+    {
+    }
+    catch (ApiException exception)
+    {
+      if (!_cancellation.IsCancellationRequested && version == _loadVersion)
+      {
+        _listError = exception.Message;
+      }
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+    {
+      if (!_cancellation.IsCancellationRequested && version == _loadVersion)
+      {
+        _listError = "Не удалось загрузить учётные записи. Повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (version == _loadVersion)
+      {
+        _loading = false;
+      }
+    }
+  }
+
+  private async Task CreateAsync()
+  {
+    if (_saving || _loading || _cancellation.IsCancellationRequested)
+    {
+      return;
+    }
+
+    _saving = true;
+    _formError = null;
+    _notice = null;
+    try
+    {
+      var request = new CreateAccountRequest(_form.UserName.Trim(), _form.Password, _form.Role,
+        _form.Role == ApplicationRoles.MedicalWorker ? _form.MedicalWorkerId : null);
+      var saved = await Api.CreateAsync(request, _cancellation.Token);
+      if (_cancellation.IsCancellationRequested)
+      {
+        return;
+      }
+
+      _accounts = (_accounts ?? []).Append(saved).ToArray();
+      _notice = $"Учётная запись {saved.UserName} создана.";
+      _form.Password = "";
+      _form = new AccountForm();
+      await LoadAsync();
+    }
+    catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+    {
+    }
+    catch (ApiException exception)
+    {
+      _formError = exception.Message;
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+    {
+      _formError = "Не удалось подтвердить создание. Обновите список перед повторной попыткой.";
+    }
+    finally
+    {
+      _form.Password = "";
+      _saving = false;
+    }
+  }
+
+  private string WorkerName(Guid? id)
+  {
+    var worker = _workers?.FirstOrDefault(item => item.Id == id);
+    return worker is null ? "—" : $"{worker.LastName} {worker.FirstName}";
+  }
+
+  private string AccountStatus(AccountDto account)
+  {
+    if (account.IsLockedOut)
+    {
+      return "Временно заблокирован";
+    }
+
+    if (account.Role == ApplicationRoles.MedicalWorker)
+    {
+      var worker = _workers?.FirstOrDefault(item => item.Id == account.MedicalWorkerId);
+      if (worker is null)
+      {
+        return "Нет действующего сотрудника";
+      }
+
+      if (worker.IsDeleted)
+      {
+        return "Сотрудник удалён";
+      }
+    }
+
+    return "Активен";
+  }
+
+  public void Dispose()
+  {
+    _form.Password = "";
+    _cancellation.Cancel();
+    _cancellation.Dispose();
+  }
+
+  private sealed class AccountForm : IValidatableObject
+  {
+    [Required(ErrorMessage = "Укажите логин.")]
+    [StringLength(64, MinimumLength = 3, ErrorMessage = "Логин: от 3 до 64 символов.")]
+    [RegularExpression("[A-Za-z0-9._@+-]+", ErrorMessage = "Логин содержит недопустимые символы.")]
+    public string UserName { get; set; } = "";
+
+    [Required(ErrorMessage = "Укажите пароль.")]
+    [StringLength(128, MinimumLength = 12, ErrorMessage = "Пароль: от 12 до 128 символов.")]
+    public string Password { get; set; } = "";
+
+    [Required(ErrorMessage = "Выберите роль.")]
+    public string Role { get; set; } = ApplicationRoles.MedicalWorker;
+
+    public Guid? MedicalWorkerId { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+      if (Role == ApplicationRoles.MedicalWorker && (MedicalWorkerId is null || MedicalWorkerId == Guid.Empty))
+      {
+        yield return new ValidationResult("Выберите медработника для этой учётной записи.", [nameof(MedicalWorkerId)]);
+      }
+    }
+  }
+}
