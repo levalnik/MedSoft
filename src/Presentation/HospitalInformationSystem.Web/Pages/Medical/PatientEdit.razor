@@ -1,0 +1,346 @@
+@page "/medical/patients/new"
+@page "/medical/patients/{Id:guid}"
+@using HospitalInformationSystem.Contracts.Patients
+@implements IDisposable
+@inject PatientsApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "Новый пациент" : "Карточка пациента") · Учебная HIS</PageTitle>
+<a class="back-link" href="/medical/patients">
+  <Icon Name="arrow"/>
+  К списку пациентов</a>
+<div class="page-heading">
+  <div><h1>@(Id is null ? "Новый пациент" : "Редактирование пациента")</h1>
+    <p>Регистрационные данные пациента лечебного учреждения.</p></div>
+</div>
+<ErrorAlert Message="@_error"/>
+@if (_loading)
+{
+  <div class="surface empty-state" role="status">Загрузка карточки…</div>
+}
+else if (_model is not null)
+{
+  <div class="profile-layout">
+    <aside class="profile-panel" aria-label="Сведения о пациенте">
+      <span class="eyebrow">КАРТОЧКА ПАЦИЕНТА</span>
+      <div class="profile-avatar">
+        <Icon Name="patients"/>
+      </div>
+      <h2>@(string.IsNullOrWhiteSpace(_model.LastName) ? "Новый пациент" : _model.LastName)<span>@_model.FirstName</span></h2>
+      <p class="profile-position">@SexLabel(_model.Sex) · @_model.BirthDate.ToString("dd.MM.yyyy")</p>
+      @if (Id is not null)
+      {
+        <span class="status @(_patient?.HasMedicalRecord == true ? "status-active" : "status-deleted")">
+          <span class="status-dot"></span>@(_patient?.HasMedicalRecord == true ? "ЭМК есть" : "Нет ЭМК")
+        </span>
+        <a class="btn btn-outline-primary" href="/medical/patients/@Id/medical-record">
+          <Icon Name="record"/>
+          @(_patient?.HasMedicalRecord == true ? "Открыть ЭМК" : "Создать ЭМК")
+        </a>
+      }
+      <div class="profile-note">
+        <Icon Name="record"/>
+        <p>Электронная карта ведётся на отдельном экране пациента.</p></div>
+    </aside>
+    <section class="surface edit-surface" aria-label="Редактирование данных">
+      <EditForm Model="_model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator/>
+        <fieldset disabled="@_busy">
+          <div class="form-section">
+            <div class="section-title"><span class="step-number">01</span>
+              <div><h2>Личные данные</h2>
+                <p>Фамилия и имя обязательны, отчество — по желанию.</p></div>
+            </div>
+            <div class="form-grid">
+              <div><label for="lastName">Фамилия</label>
+                <InputText id="lastName" class="form-control" @bind-Value="_model.LastName" maxlength="64"
+                           placeholder="Например, Соколова" autocomplete="family-name"/>
+                <ValidationMessage For="() => _model.LastName"/>
+              </div>
+              <div><label for="firstName">Имя</label>
+                <InputText id="firstName" class="form-control" @bind-Value="_model.FirstName" maxlength="64"
+                           placeholder="Например, Елена" autocomplete="given-name"/>
+                <ValidationMessage For="() => _model.FirstName"/>
+              </div>
+              <div><label for="middleName">Отчество</label>
+                <InputText id="middleName" class="form-control" @bind-Value="_model.MiddleName" maxlength="64"
+                           placeholder="Например, Петровна" autocomplete="additional-name"/>
+                <ValidationMessage For="() => _model.MiddleName"/>
+              </div>
+            </div>
+          </div>
+          <div class="form-section">
+            <div class="section-title"><span class="step-number">02</span>
+              <div><h2>Регистрационные сведения</h2>
+                <p>Дата рождения и административный пол.</p></div>
+            </div>
+            <div class="form-grid">
+              <div><label for="birthDate">Дата рождения</label>
+                <InputDate id="birthDate" class="form-control" @bind-Value="_model.BirthDate" max="@_today"/>
+                <ValidationMessage For="() => _model.BirthDate"/>
+              </div>
+              <div><label for="sex">Пол</label>
+                <InputSelect id="sex" class="form-control" @bind-Value="_model.Sex">
+                  <option value="@AdministrativeSex.Male">М — мужской</option>
+                  <option value="@AdministrativeSex.Female">Ж — женский</option>
+                  <option value="@AdministrativeSex.Unknown">НУ — не указан</option>
+                </InputSelect>
+                <ValidationMessage For="() => _model.Sex"/>
+              </div>
+            </div>
+            <div><label for="comment">Комментарий</label>
+              <InputText id="comment" class="form-control" @bind-Value="_model.Comment" maxlength="32"
+                         placeholder="Например, аллергия на пенициллин"/>
+              <ValidationMessage For="() => _model.Comment"/>
+            </div>
+            <p class="field-hint">ФИО — до 64 символов, комментарий — до 32 символов.</p>
+          </div>
+          <div class="form-actions">
+            <a class="btn btn-light" href="/medical/patients">Отмена</a>
+            <button type="submit" class="btn btn-primary">
+              <Icon Name="check"/> @(_busy ? "Сохранение…" : "Сохранить")</button>
+          </div>
+        </fieldset>
+      </EditForm>
+      @if (Id is not null)
+      {
+        <div class="delete-section">
+          <div><strong>Пациент выбыл?</strong>
+            <p>Удалить запись можно только если у пациента нет электронной карты.</p></div>
+          <button type="button" class="btn btn-soft-danger" disabled="@_busy" @onclick="() => _confirmDelete = true">
+            <Icon Name="delete"/>
+            Удалить пациента
+          </button>
+        </div>
+      }
+      @if (_confirmDelete)
+      {
+        <div class="confirm-panel" role="alertdialog" aria-labelledby="patient-edit-delete-title">
+          <div>
+            <strong id="patient-edit-delete-title">Удалить пациента из реестра?</strong>
+            <p>@_model.LastName @_model.FirstName — запись будет удалена без возможности восстановления.</p>
+          </div>
+          <div class="button-row">
+            <button class="btn btn-danger" disabled="@_busy" @onclick="DeleteAsync">
+              @(_busy ? "Удаление…" : "Удалить")
+            </button>
+            <button class="btn btn-light" disabled="@_busy" @onclick="() => _confirmDelete = false">Отмена</button>
+          </div>
+        </div>
+      }
+    </section>
+  </div>
+}
+else
+{
+  <button class="btn btn-outline-primary" @onclick="LoadAsync">Повторить загрузку</button>
+}
+
+@code {
+  [Parameter] public Guid? Id { get; set; }
+
+  private PatientForm? _model;
+  private PatientDto? _patient;
+  private string? _error;
+  private bool _loading;
+  private bool _busy;
+  private bool _confirmDelete;
+  private bool _disposed;
+  private CancellationTokenSource? _routeCancellation;
+  private Guid? _loadedId;
+
+  private static readonly string _today = DateTime.Today.ToString("yyyy-MM-dd");
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (_loadedId == Id && _model is not null)
+    {
+      return;
+    }
+
+    _loadedId = Id;
+    await LoadAsync();
+  }
+
+  private async Task LoadAsync()
+  {
+    _routeCancellation?.Cancel();
+    _routeCancellation?.Dispose();
+    _routeCancellation = new CancellationTokenSource();
+    var token = _routeCancellation.Token;
+    _loading = true;
+    _busy = false;
+    _error = null;
+    _patient = null;
+    _model = null;
+    _confirmDelete = false;
+    try
+    {
+      var patient = Id is { } id ? await Api.GetAsync(id, token) : null;
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      _patient = patient;
+      _model = patient is null
+        ? new PatientForm { BirthDate = new DateOnly(2000, 1, 1), Sex = AdministrativeSex.Unknown }
+        : new PatientForm
+        {
+          FirstName = patient.FirstName, LastName = patient.LastName, MiddleName = patient.MiddleName ?? "",
+          BirthDate = patient.BirthDate, Sex = patient.Sex, Comment = patient.Comment ?? ""
+        };
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsCurrent(token))
+      {
+        _error = e.Message;
+      }
+    }
+    catch (HttpRequestException)
+    {
+      if (IsCurrent(token))
+      {
+        _error = "Не удалось связаться с сервером.";
+      }
+    }
+    catch (TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _error = "Сервер не ответил вовремя. Повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _loading = false;
+      }
+    }
+  }
+
+  private Task SaveAsync() => ExecuteAsync(async token =>
+  {
+    if (_model is null)
+    {
+      return;
+    }
+
+    var request = new SavePatientRequest(
+      _model.FirstName.Trim(), _model.LastName.Trim(), Normalize(_model.MiddleName),
+      _model.BirthDate, _model.Sex, Normalize(_model.Comment));
+    if (Id is { } id)
+    {
+      await Api.UpdateAsync(id, request, token);
+    }
+    else
+    {
+      await Api.CreateAsync(request, token);
+    }
+  });
+
+  private Task DeleteAsync() => ExecuteAsync(async token =>
+  {
+    if (Id is { } id)
+    {
+      await Api.DeleteAsync(id, token);
+    }
+  });
+
+  private async Task ExecuteAsync(Func<CancellationToken, Task> action)
+  {
+    if (_busy || _routeCancellation is null || _disposed)
+    {
+      return;
+    }
+
+    var token = _routeCancellation.Token;
+    _busy = true;
+    _error = null;
+    try
+    {
+      await action(token);
+      if (IsCurrent(token))
+      {
+        Navigation.NavigateTo("/medical/patients");
+      }
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsCurrent(token))
+      {
+        _error = e.Message;
+        _confirmDelete = false;
+      }
+    }
+    catch (HttpRequestException)
+    {
+      if (IsCurrent(token))
+      {
+        _error = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      }
+    }
+    catch (TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _error = "Сервер не ответил вовремя. Проверьте список перед повторной операцией.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _busy = false;
+      }
+    }
+  }
+
+  private static string? Normalize(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+  private static string SexLabel(AdministrativeSex sex) => sex switch
+  {
+    AdministrativeSex.Male => "Мужской",
+    AdministrativeSex.Female => "Женский",
+    _ => "Пол не указан"
+  };
+
+  private bool IsCurrent(CancellationToken token) => !_disposed && !token.IsCancellationRequested;
+
+  public void Dispose()
+  {
+    _disposed = true;
+    _routeCancellation?.Cancel();
+    _routeCancellation?.Dispose();
+  }
+
+  private sealed class PatientForm
+  {
+    [Required(ErrorMessage = "Укажите имя.")]
+    [StringLength(64, MinimumLength = 1, ErrorMessage = "Имя: от 1 до 64 символов.")]
+    public string FirstName { get; set; } = "";
+
+    [Required(ErrorMessage = "Укажите фамилию.")]
+    [StringLength(64, MinimumLength = 1, ErrorMessage = "Фамилия: от 1 до 64 символов.")]
+    public string LastName { get; set; } = "";
+
+    [StringLength(64, ErrorMessage = "Отчество: не более 64 символов.")]
+    public string MiddleName { get; set; } = "";
+
+    [Required(ErrorMessage = "Укажите дату рождения.")]
+    public DateOnly BirthDate { get; set; }
+
+    public AdministrativeSex Sex { get; set; } = AdministrativeSex.Unknown;
+
+    [StringLength(32, ErrorMessage = "Комментарий: не более 32 символов.")]
+    public string Comment { get; set; } = "";
+  }
+}

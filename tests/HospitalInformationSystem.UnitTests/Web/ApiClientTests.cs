@@ -78,7 +78,7 @@ public sealed class ApiClientTests
     {
         using var http = CreateClient(HttpStatusCode.OK, "[]");
 
-        var result = await new DiagnosesApiClient(http).ListAsync();
+        var result = await new DiagnosesApiClient(http).ListAsync(CancellationToken.None);
 
         result.Should().BeEmpty();
     }
@@ -90,7 +90,7 @@ public sealed class ApiClientTests
         using var http = CreateClient(HttpStatusCode.OK,
             $$"""{"id":"{{id}}","firstName":"Иван","lastName":"Иванов","position":"Врач","isDeleted":false}""");
 
-        var result = await new MedicalWorkersApiClient(http).GetAsync(id);
+        var result = await new MedicalWorkersApiClient(http).GetAsync(id, CancellationToken.None);
 
         result.Should().Be(new MedicalWorkerDto(id, "Иван", "Иванов", "Врач", false));
     }
@@ -101,7 +101,7 @@ public sealed class ApiClientTests
         using var http = CreateClient(HttpStatusCode.OK, """{"created":0,"updated":0,"unchanged":1}""");
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("Code,Name\nA00.00,Холера"));
 
-        var result = await new DiagnosesApiClient(http).ImportAsync(stream, "диагнозы.csv");
+        var result = await new DiagnosesApiClient(http).ImportAsync(stream, "диагнозы.csv", CancellationToken.None);
 
         result.Created.Should().Be(0);
         result.Updated.Should().Be(0);
@@ -113,7 +113,7 @@ public sealed class ApiClientTests
     {
         using var http = CreateClient(HttpStatusCode.NoContent, "");
 
-        await new MedicalWorkersApiClient(http).DeleteAsync(Guid.NewGuid());
+        await new MedicalWorkersApiClient(http).DeleteAsync(Guid.NewGuid(), CancellationToken.None);
     }
 
     [Theory]

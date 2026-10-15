@@ -1,7 +1,284 @@
 @page "/medical/patients"
 @page "/medical/my-patients"
+@using HospitalInformationSystem.Contracts.Patients
+@implements IDisposable
+@inject PatientsApiClient Api
 
 <PageTitle>Пациенты · Учебная HIS</PageTitle>
 <div class="eyebrow"><span class="eyebrow-line"></span> РАБОТА С ПАЦИЕНТАМИ</div>
-<div class="page-heading"><div><h1>Пациенты</h1><p>Реестр пациентов и электронные медицинские карты</p></div><span class="development-label">В разработке</span></div>
-<section class="surface planned-section"><div class="planned-art" aria-hidden="true"><Icon Name="patients" /><span>02 / ПАЦИЕНТЫ</span></div><div class="planned-content"><span class="eyebrow">СЛЕДУЮЩИЙ ЭТАП</span><h2>Вся история заботы<br />в одной карте</h2><p>Здесь появятся карточки пациентов, электронные медицинские карты, назначения и история изменений. Раздел пока не реализован.</p><a class="text-link" href="/admin/medical-workers">Перейти к медработникам <Icon Name="forward" /></a></div></section>
+<div class="page-heading">
+  <div>
+    <h1>Пациенты</h1>
+    <p>Реестр пациентов и электронные медицинские карты.</p>
+  </div>
+  <a class="btn btn-primary" href="/medical/patients/new">
+    <Icon Name="plus"/>
+    Добавить пациента</a>
+</div>
+
+@if (_patients is not null)
+{
+  <div class="registry-summary" aria-label="Сводка по пациентам">
+    <div class="summary-item"><span class="summary-icon"><Icon Name="patients"/></span>
+      <div><span class="summary-label">Всего пациентов</span><strong>@_patients.Count.ToString("D2")</strong></div>
+    </div>
+    <div class="summary-item"><span class="summary-icon active-icon"><Icon Name="record"/></span>
+      <div><span class="summary-label">С электронной картой</span><strong>@_patients.Count(x => x.HasMedicalRecord).ToString("D2")</strong></div>
+    </div>
+    <div class="summary-item"><span class="summary-icon archived-icon"><Icon Name="patients"/></span>
+      <div><span class="summary-label">Без карты</span><strong>@_patients.Count(x => !x.HasMedicalRecord).ToString("D2")</strong></div>
+    </div>
+    <div class="summary-note">
+      <Icon Name="record"/>
+      <span>Откройте карточку,<br/>чтобы вести ЭМК пациента.</span></div>
+  </div>
+}
+<ErrorAlert Message="@_error"/>
+
+@if (_pendingDelete is not null)
+{
+  <div class="confirm-panel" role="alertdialog" aria-labelledby="patient-delete-title">
+    <div>
+      <strong id="patient-delete-title">Удалить пациента из реестра?</strong>
+      <p>@_pendingDelete.LastName @_pendingDelete.FirstName — запись будет удалена без возможности восстановления.</p>
+    </div>
+    <ErrorAlert Message="@_deleteError"/>
+    <div class="button-row">
+      <button class="btn btn-danger" disabled="@_deleting" @onclick="DeleteAsync">
+        @(_deleting ? "Удаление…" : "Удалить")
+      </button>
+      <button class="btn btn-light" disabled="@_deleting" @onclick="CancelDelete">Отмена</button>
+    </div>
+  </div>
+}
+
+<section class="surface" aria-label="Реестр пациентов">
+  <div class="registry-heading">
+    <div><h2>Реестр пациентов</h2>
+      <p>ФИО, дата рождения, пол и наличие электронной карты.</p></div>
+    <span class="section-index">01 / ПАЦИЕНТЫ</span></div>
+  <div class="table-toolbar">
+    <div class="search-field">
+      <Icon Name="search"/>
+      <input type="search" aria-label="Поиск пациента" placeholder="Фамилия, имя или отчество" @bind="_search"
+             @bind:event="oninput"/></div>
+    <button class="btn btn-outline-primary" disabled="@_loading" @onclick="LoadAsync">Обновить список</button>
+  </div>
+  @if (_loading)
+  {
+    <div class="empty-state" role="status">Загрузка пациентов…</div>
+  }
+  else if (_patients is null)
+  {
+    <div class="empty-state"><h2>Не удалось загрузить список</h2>
+      <p>Проверьте подключение к серверу и повторите попытку.</p>
+      <button class="btn btn-outline-primary" @onclick="LoadAsync">Повторить</button>
+    </div>
+  }
+  else
+  {
+    <div class="table-responsive">
+      <table class="table mr-table">
+        <thead>
+        <tr>
+          <th scope="col">Пациент</th>
+          <th scope="col">Дата рождения</th>
+          <th scope="col">Пол</th>
+          <th scope="col">ЭМК</th>
+          <th scope="col" class="actions-cell">Действия</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var patient in VisiblePatients)
+        {
+          <tr @key="patient.Id">
+            <td data-label="Пациент">
+              <a class="worker-name" href="/medical/patients/@patient.Id">
+                <span class="table-avatar">@patient.LastName[0]@patient.FirstName[0]</span>
+                <span><span class="worker-fullname">@patient.LastName @patient.FirstName @patient.MiddleName</span><small>Карточка пациента</small></span>
+              </a>
+            </td>
+            <td data-label="Дата рождения">@patient.BirthDate.ToString("dd.MM.yyyy")</td>
+            <td data-label="Пол">@SexLabel(patient.Sex)</td>
+            <td data-label="ЭМК">
+              @if (patient.HasMedicalRecord)
+              {
+                <span class="status status-active"><span class="status-dot"></span>ЭМК есть</span>
+              }
+              else
+              {
+                <span class="status status-deleted"><span class="status-dot"></span>Нет ЭМК</span>
+              }
+            </td>
+            <td class="actions-cell">
+              <a class="row-edit" href="/medical/patients/@patient.Id/medical-record"
+                 aria-label="@(patient.HasMedicalRecord ? "Открыть ЭМК" : "Создать ЭМК"): @patient.LastName @patient.FirstName">
+                @(patient.HasMedicalRecord ? "Открыть ЭМК" : "Создать ЭМК")
+                <Icon Name="forward"/>
+              </a>
+              <button class="icon-button danger" title="Удалить пациента" disabled="@_deleting"
+                      aria-label="Удалить: @patient.LastName @patient.FirstName" @onclick="() => AskDelete(patient)">
+                <Icon Name="delete"/>
+              </button>
+            </td>
+          </tr>
+        }
+        </tbody>
+      </table>
+    </div>
+    @if (!VisiblePatients.Any())
+    {
+      <div class="empty-state">
+        @(_patients.Count == 0 ? "В реестре пока нет пациентов. Добавьте первого пациента." : "По вашему запросу ничего не найдено.")
+      </div>
+    }
+
+    <div class="table-footer"><span>Показано @VisiblePatients.Count() из @_patients.Count пациентов</span></div>
+  }
+</section>
+
+@code {
+  private IReadOnlyList<PatientDto>? _patients;
+  private PatientDto? _pendingDelete;
+  private string? _error;
+  private string? _deleteError;
+  private string _search = "";
+  private bool _loading = true;
+  private bool _deleting;
+  private CancellationTokenSource? _cts;
+  private int _loadVersion;
+  private bool _disposed;
+
+  private IEnumerable<PatientDto> VisiblePatients => (_patients ?? [])
+    .Where(x => $"{x.LastName} {x.FirstName} {x.MiddleName}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+  protected override Task OnInitializedAsync()
+  {
+    _cts = new CancellationTokenSource();
+    return LoadAsync();
+  }
+
+  private async Task LoadAsync()
+  {
+    if (_cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    var version = ++_loadVersion;
+    _loading = true;
+    _error = null;
+    try
+    {
+      var patients = await Api.ListAsync(token);
+      if (!IsCurrent(token) || version != _loadVersion)
+      {
+        return;
+      }
+
+      _patients = patients;
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _error = e.Message;
+      }
+    }
+    catch (HttpRequestException)
+    {
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _error = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+      }
+    }
+    catch (TaskCanceledException)
+    {
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _error = "Сервер не ответил вовремя. Повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (version == _loadVersion)
+      {
+        _loading = false;
+      }
+    }
+  }
+
+  private void AskDelete(PatientDto patient)
+  {
+    if (_deleting)
+    {
+      return;
+    }
+
+    _pendingDelete = patient;
+    _deleteError = null;
+  }
+
+  private void CancelDelete()
+  {
+    _pendingDelete = null;
+    _deleteError = null;
+  }
+
+  private async Task DeleteAsync()
+  {
+    if (_pendingDelete is null || _deleting || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    _deleting = true;
+    _deleteError = null;
+    try
+    {
+      await Api.DeleteAsync(_pendingDelete.Id, token);
+      _pendingDelete = null;
+      await LoadAsync();
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      _deleteError = e.Message;
+    }
+    catch (HttpRequestException)
+    {
+      _deleteError = "Не удалось связаться с сервером.";
+    }
+    catch (TaskCanceledException)
+    {
+      _deleteError = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат.";
+    }
+    finally
+    {
+      _deleting = false;
+    }
+  }
+
+  private bool IsCurrent(CancellationToken token) => !_disposed && !token.IsCancellationRequested;
+
+  private static string SexLabel(AdministrativeSex sex) => sex switch
+  {
+    AdministrativeSex.Male => "М",
+    AdministrativeSex.Female => "Ж",
+    _ => "НУ"
+  };
+
+  public void Dispose()
+  {
+    _disposed = true;
+    _cts?.Cancel();
+    _cts?.Dispose();
+  }
+}

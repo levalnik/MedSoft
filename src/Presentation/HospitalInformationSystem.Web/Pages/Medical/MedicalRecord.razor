@@ -1,0 +1,1054 @@
+@page "/medical/patients/{PatientId:guid}/medical-record"
+@using System.Globalization
+@using System.Net
+@using System.Text.Json
+@using HospitalInformationSystem.Contracts.Patients
+@using HospitalInformationSystem.Contracts.Diagnoses
+@using HospitalInformationSystem.Contracts.MedicalRecords
+@implements IDisposable
+@inject PatientsApiClient PatientsApi
+@inject MedicalRecordsApiClient RecordsApi
+@inject MedicalWorkersApiClient WorkersApi
+@inject DiagnosesApiClient DiagnosesApi
+
+<PageTitle>Электронная медицинская карта · Учебная HIS</PageTitle>
+<a class="back-link" href="/medical/patients">
+  <Icon Name="arrow"/>
+  К списку пациентов</a>
+<div class="eyebrow"><span class="eyebrow-line"></span> ЭЛЕКТРОННАЯ МЕДИЦИНСКАЯ КАРТА</div>
+<div class="page-heading">
+  <div>
+    <h1>@(_patient is null ? "Медицинская карта" : $"{_patient.LastName} {_patient.FirstName}")</h1>
+    <p>История диагнозов, назначений и изменений пациента.</p>
+  </div>
+</div>
+
+<ErrorAlert Message="@_loadError"/>
+
+@if (_loading)
+{
+  <div class="surface empty-state" role="status">Загрузка медицинской карты…</div>
+}
+else if (_patient is null)
+{
+  <div class="surface empty-state">
+    <h2>Не удалось загрузить карту</h2>
+    <p>Проверьте подключение к серверу и повторите попытку.</p>
+    <button class="btn btn-outline-primary" @onclick="ReloadAsync">Повторить</button>
+  </div>
+}
+else
+{
+  <section class="surface mr-patient" aria-label="Сведения о пациенте">
+    <div class="mr-patient-main">
+      <span class="table-avatar mr-avatar">@_patient.LastName[0]@_patient.FirstName[0]</span>
+      <div>
+        <h2>@_patient.LastName @_patient.FirstName @_patient.MiddleName</h2>
+        <div class="mr-patient-meta">
+          <span><span class="mr-meta-label">Дата рождения</span>@_patient.BirthDate.ToString("dd.MM.yyyy")</span>
+          <span><span class="mr-meta-label">Пол</span>@SexLabel(_patient.Sex)</span>
+          <span><span class="mr-meta-label">ЭМК</span>@(_record is null ? "отсутствует" : "создана")</span>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_patient.Comment))
+        {
+          <p class="mr-patient-comment">@_patient.Comment</p>
+        }
+      </div>
+    </div>
+  </section>
+
+  @if (_record is null)
+  {
+    <section class="surface mr-create" aria-label="Создание ЭМК">
+      <div class="registry-heading">
+        <div>
+          <h2>Карта ещё не создана</h2>
+          <p>Чтобы начать вести диагнозы и назначения, создайте ЭМК от имени медработника.</p>
+        </div>
+        <span class="section-index">ЭМК / НОВАЯ</span>
+      </div>
+      <div class="mr-create-body">
+        @if (!_editing)
+        {
+          <button class="btn btn-primary" @onclick="BeginCreate">
+            <Icon Name="plus"/>
+            Создать ЭМК
+          </button>
+        }
+        else
+        {
+          @AuthorSelect
+          <div class="button-row">
+            <button class="btn btn-primary" disabled="@(_busy || _authorId is null)" @onclick="CreateRecordAsync">
+              <Icon Name="check"/> @(_busy ? "Создание…" : "Создать карту")
+            </button>
+            <button class="btn btn-light" disabled="@_busy" @onclick="CancelEdit">Отмена</button>
+          </div>
+        }
+        @ActionFeedback
+      </div>
+    </section>
+  }
+  else
+  {
+    <div class="mr-tabs" role="tablist" aria-label="Разделы карты">
+      <button role="tab" class="@TabClass(Tab.Diagnoses)" aria-selected="@(_tab == Tab.Diagnoses)"
+              disabled="@_busy" @onclick="() => SelectTabAsync(Tab.Diagnoses)">Диагнозы</button>
+      <button role="tab" class="@TabClass(Tab.Prescriptions)" aria-selected="@(_tab == Tab.Prescriptions)"
+              disabled="@_busy" @onclick="() => SelectTabAsync(Tab.Prescriptions)">Назначения</button>
+      <button role="tab" class="@TabClass(Tab.History)" aria-selected="@(_tab == Tab.History)"
+              disabled="@_busy" @onclick="() => SelectTabAsync(Tab.History)">История изменений</button>
+    </div>
+
+    @ActionFeedback
+
+    <section class="surface" aria-label="Содержимое карты">
+      @if (_tab == Tab.Diagnoses)
+      {
+        <div class="registry-heading">
+          <div>
+            <h2>Диагнозы</h2>
+            <p>@(_editing ? "Режим редактирования. Изменения сохраняются на сервере." : "Текущие диагнозы карты (только просмотр).")</p>
+          </div>
+          @if (_editing)
+          {
+            <button class="btn btn-light" disabled="@_busy" @onclick="CancelEdit">Выйти из редактирования</button>
+          }
+          else
+          {
+            <button class="btn btn-primary" @onclick="BeginEditAsync"><Icon Name="edit"/> Редактировать</button>
+          }
+        </div>
+        @if (_editing)
+        {
+          @AuthorSelect
+          <div class="mr-edit-form">
+            <div class="mr-field mr-field-grow">
+              <label for="diagnosis-select">Диагноз из справочника</label>
+              <select id="diagnosis-select" class="form-control"
+                      value="@(_selectedDiagnosisId?.ToString() ?? "")" @onchange="OnDiagnosisSelected">
+                <option value="">— выберите диагноз —</option>
+                @foreach (var diagnosis in _diagnoses ?? [])
+                {
+                  <option value="@diagnosis.Id">@diagnosis.Code · @diagnosis.Name</option>
+                }
+              </select>
+            </div>
+            <button class="btn btn-primary" disabled="@(_busy || _authorId is null || _selectedDiagnosisId is null)"
+                    @onclick="AddDiagnosisAsync">
+              <Icon Name="plus"/> Добавить диагноз
+            </button>
+          </div>
+        }
+        <div class="table-responsive">
+          <table class="table mr-table">
+            <thead>
+            <tr>
+              <th scope="col">Код</th>
+              <th scope="col">Наименование</th>
+              <th scope="col">Добавлен</th>
+              @if (_editing)
+              {
+                <th scope="col" class="actions-cell">Действия</th>
+              }
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var diagnosis in _record.Diagnoses)
+            {
+              <tr @key="diagnosis.Id">
+                <td data-label="Код"><code>@diagnosis.Code</code></td>
+                <td data-label="Наименование">@diagnosis.Name</td>
+                <td data-label="Добавлен">@FormatLocal(diagnosis.AddedAtUtc)</td>
+                @if (_editing)
+                {
+                  <td class="actions-cell">
+                    <button class="icon-button danger" title="Удалить диагноз" disabled="@(_busy || _authorId is null)"
+                            @onclick="() => RemoveDiagnosisAsync(diagnosis.Id)">
+                      <Icon Name="delete"/>
+                    </button>
+                  </td>
+                }
+              </tr>
+            }
+            </tbody>
+          </table>
+        </div>
+        @if (_record.Diagnoses.Count == 0)
+        {
+          <div class="empty-state">В карте пока нет диагнозов.</div>
+        }
+      }
+      else if (_tab == Tab.Prescriptions)
+      {
+        <div class="registry-heading">
+          <div>
+            <h2>Назначения</h2>
+            <p>@(_editing ? "Режим редактирования. Изменения сохраняются на сервере." : "Действующие назначения карты (только просмотр).")</p>
+          </div>
+          @if (_editing)
+          {
+            <button class="btn btn-light" disabled="@_busy" @onclick="CancelEdit">Выйти из редактирования</button>
+          }
+          else
+          {
+            <button class="btn btn-primary" @onclick="BeginEditAsync"><Icon Name="edit"/> Редактировать</button>
+          }
+        </div>
+        @if (_editing)
+        {
+          @AuthorSelect
+          <div class="mr-edit-form">
+            <div class="mr-field mr-field-grow">
+              <label for="prescription-text">Текст назначения</label>
+              <textarea id="prescription-text" class="form-control" rows="2" maxlength="@PrescriptionTextMaxLength"
+                        placeholder="Например, Парацетамол 500 мг 3 раза в день" @bind="_prescriptionText"></textarea>
+              @if (!string.IsNullOrEmpty(_prescriptionText) && !IsPrescriptionTextValid(_prescriptionText))
+              {
+                <p class="validation-message">@PrescriptionLengthMessage</p>
+              }
+            </div>
+            <button class="btn btn-primary"
+                    disabled="@(_busy || _authorId is null || !IsPrescriptionTextValid(_prescriptionText))"
+                    @onclick="AddPrescriptionAsync">
+              <Icon Name="plus"/> Добавить назначение
+            </button>
+          </div>
+        }
+        <ul class="mr-prescriptions">
+          @foreach (var prescription in _record.Prescriptions)
+          {
+            <li @key="prescription.Id">
+              @if (_editing && _replaceId == prescription.Id)
+              {
+                <div class="mr-field mr-field-grow">
+                  <label for="replace-text">Новый текст назначения</label>
+                  <textarea id="replace-text" class="form-control" rows="2" maxlength="@PrescriptionTextMaxLength"
+                            @bind="_replaceText"></textarea>
+                  @if (!string.IsNullOrEmpty(_replaceText) && !IsPrescriptionTextValid(_replaceText))
+                  {
+                    <p class="validation-message">@PrescriptionLengthMessage</p>
+                  }
+                </div>
+                <div class="button-row">
+                  <button class="btn btn-primary"
+                          disabled="@(_busy || _authorId is null || !IsPrescriptionTextValid(_replaceText))"
+                          @onclick="() => ReplacePrescriptionAsync(prescription.Id)">
+                    <Icon Name="check"/> Сохранить
+                  </button>
+                  <button class="btn btn-light" disabled="@_busy" @onclick="CancelReplace">Отмена</button>
+                </div>
+              }
+              else
+              {
+                <div class="mr-prescription-body">
+                  <p class="mr-prescription-text">@prescription.Text</p>
+                  <small>Назначено @FormatLocal(prescription.CreatedAtUtc)@(prescription.ReplacesPrescriptionId is null ? "" : " · замена предыдущего")</small>
+                </div>
+                @if (_editing)
+                {
+                  <div class="button-row">
+                    <button class="btn btn-light" disabled="@(_busy || _authorId is null)"
+                            @onclick="() => BeginReplace(prescription)">
+                      <Icon Name="edit"/> Изменить
+                    </button>
+                    <button class="btn btn-soft-danger" disabled="@(_busy || _authorId is null)"
+                            @onclick="() => CancelPrescriptionAsync(prescription.Id)">
+                      <Icon Name="delete"/> Отменить
+                    </button>
+                  </div>
+                }
+              }
+            </li>
+          }
+        </ul>
+        @if (_record.Prescriptions.Count == 0)
+        {
+          <div class="empty-state">В карте пока нет действующих назначений.</div>
+        }
+      }
+      else
+      {
+        <div class="registry-heading">
+          <div>
+            <h2>История изменений</h2>
+            <p>Все события карты. Время указано в вашем часовом поясе (@OffsetLabel).</p>
+          </div>
+          <span class="section-index">ВЕРСИЯ @_record.Version</span>
+        </div>
+        @if (_historyLoading && _history is null)
+        {
+          <div class="empty-state" role="status">Загрузка истории…</div>
+        }
+        else if (_historyError is not null)
+        {
+          <div class="empty-state">
+            <p>@_historyError</p>
+            <button class="btn btn-outline-primary" @onclick="LoadHistoryAsync">Повторить</button>
+          </div>
+        }
+        else if (_history is not null)
+        {
+          <div class="table-responsive">
+            <table class="table mr-table">
+              <thead>
+              <tr>
+                <th scope="col">Версия</th>
+                <th scope="col">Время</th>
+                <th scope="col">Действие</th>
+                <th scope="col">Автор</th>
+                <th scope="col">Данные события</th>
+              </tr>
+              </thead>
+              <tbody>
+              @foreach (var item in _history)
+              {
+                <tr @key="item.Version">
+                  <td data-label="Версия">@item.Version</td>
+                  <td data-label="Время">@FormatLocal(item.OccurredAtUtc)</td>
+                  <td data-label="Действие">@EventTitle(item.EventType)</td>
+                  <td data-label="Автор">@item.PerformedByName<small class="mr-author-position">@item.PerformedByPosition</small></td>
+                  <td data-label="Данные события">@DescribeEvent(item)</td>
+                </tr>
+              }
+              </tbody>
+            </table>
+          </div>
+          @if (_history.Count == 0)
+          {
+            <div class="empty-state">События не найдены.</div>
+          }
+        }
+
+        <div class="mr-snapshot">
+          <div class="registry-heading">
+            <div>
+              <h2>Состояние на момент времени</h2>
+              <p>Выберите дату и время, чтобы увидеть историческую версию карты (@OffsetLabel).</p>
+            </div>
+          </div>
+          <div class="mr-edit-form">
+            <div class="mr-field">
+              <label for="snapshot-at">Момент времени</label>
+              <input id="snapshot-at" type="datetime-local" step="1" class="form-control" @bind="_snapshotAt"
+                     @bind:format="yyyy-MM-ddTHH:mm:ss"/>
+            </div>
+            <button class="btn btn-outline-primary" disabled="@(_snapshotBusy || _snapshotAt is null)"
+                    @onclick="LoadSnapshotAsync">
+              @(_snapshotBusy ? "Загрузка…" : "Показать состояние")
+            </button>
+            @if (_snapshot is not null)
+            {
+              <button class="btn btn-light" disabled="@_snapshotBusy" @onclick="ClearSnapshot">Скрыть</button>
+            }
+          </div>
+          <ErrorAlert Message="@_snapshotError"/>
+          @if (_snapshot is not null)
+          {
+            <div class="mr-snapshot-banner" role="status">
+              <Icon Name="record"/>
+              <span>Показана историческая версия на @FormatLocal(_snapshot.At) (@OffsetLabel), версия @_snapshot.Version. Это не текущее состояние карты.</span>
+            </div>
+            <div class="mr-snapshot-grid">
+              <div>
+                <h3>Диагнозы на момент</h3>
+                @if (_snapshot.Diagnoses.Count == 0)
+                {
+                  <p class="mr-muted">Диагнозов не было.</p>
+                }
+                else
+                {
+                  <ul class="mr-snapshot-list">
+                    @foreach (var diagnosis in _snapshot.Diagnoses)
+                    {
+                      <li @key="diagnosis.Id"><code>@diagnosis.Code</code> @diagnosis.Name</li>
+                    }
+                  </ul>
+                }
+              </div>
+              <div>
+                <h3>Назначения на момент</h3>
+                @if (_snapshot.Prescriptions.Count == 0)
+                {
+                  <p class="mr-muted">Назначений не было.</p>
+                }
+                else
+                {
+                  <ul class="mr-snapshot-list">
+                    @foreach (var prescription in _snapshot.Prescriptions)
+                    {
+                      <li @key="prescription.Id">@prescription.Text</li>
+                    }
+                  </ul>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+}
+
+@code {
+  [Parameter] public Guid PatientId { get; set; }
+
+  private enum Tab { Diagnoses, Prescriptions, History }
+
+  private PatientDto? _patient;
+  private MedicalRecordDto? _record;
+  private IReadOnlyList<MedicalWorkerDto>? _workers;
+  private IReadOnlyList<DiagnosisDefinitionDto>? _diagnoses;
+  private IReadOnlyList<MedicalRecordHistoryEventDto>? _history;
+  private MedicalRecordSnapshotDto? _snapshot;
+
+  private Tab _tab = Tab.Diagnoses;
+  private bool _loading = true;
+  private bool _busy;
+  private bool _editing;
+  private Guid? _authorId;
+  private Guid? _selectedDiagnosisId;
+  private string _prescriptionText = "";
+  private Guid? _replaceId;
+  private string _replaceText = "";
+  private DateTime? _snapshotAt = DateTime.Now;
+  private bool _snapshotBusy;
+  private string? _loadError;
+  private string? _actionError;
+  private string? _actionNotice;
+  private bool _recordConflict;
+  private string? _snapshotError;
+
+  private bool _historyLoading;
+  private string? _historyError;
+  private int _historyVersion;
+  private int _editDataVersion;
+
+  private const int PrescriptionTextMinLength = 3;
+  private const int PrescriptionTextMaxLength = 128;
+
+  private Guid? _loadedPatientId;
+  private CancellationTokenSource? _cts;
+  private bool _disposed;
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (_loadedPatientId == PatientId)
+    {
+      return;
+    }
+
+    _loadedPatientId = PatientId;
+    await ReloadAsync();
+  }
+
+  // Отменяет запросы предыдущего пациента и полностью сбрасывает состояние карты.
+  // Вызывается ДО проверки идентификатора, чтобы запоздавший ответ прежнего пациента
+  // (в т.ч. при переходе к Guid.Empty) не смог заполнить карту.
+  private CancellationToken BeginNavigation()
+  {
+    _cts?.Cancel();
+    _cts?.Dispose();
+    _cts = new CancellationTokenSource();
+
+    _loading = false;
+    _loadError = null;
+    _busy = false;
+    _snapshotBusy = false;
+    ResetEditState();
+    ClearActionMessages();
+    _tab = Tab.Diagnoses;
+    _patient = null;
+    _record = null;
+    _snapshot = null;
+    _snapshotError = null;
+    _snapshotAt = DateTime.Now;
+    _workers = null;
+    _diagnoses = null;
+    InvalidateHistory();
+    return _cts.Token;
+  }
+
+  private async Task ReloadAsync()
+  {
+    var token = BeginNavigation();
+    if (PatientId == Guid.Empty)
+    {
+      _loadError = "Некорректный идентификатор пациента.";
+      return;
+    }
+
+    _loading = true;
+    try
+    {
+      var patient = await PatientsApi.GetAsync(PatientId, token);
+      var record = await RecordsApi.FindForPatientAsync(PatientId, token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      _patient = patient;
+      _record = record;
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsCurrent(token))
+      {
+        _patient = null;
+        _loadError = e.Message;
+      }
+    }
+    catch (HttpRequestException)
+    {
+      if (IsCurrent(token))
+      {
+        _patient = null;
+        _loadError = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+      }
+    }
+    catch (TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _patient = null;
+        _loadError = "Сервер не ответил вовремя. Повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _loading = false;
+      }
+    }
+  }
+
+  private async Task SelectTabAsync(Tab tab)
+  {
+    if (_busy)
+    {
+      return;
+    }
+
+    if (_tab == tab)
+    {
+      return;
+    }
+
+    _tab = tab;
+    ResetEditState();
+    if (tab == Tab.History && _record is not null && _history is null && !_historyLoading)
+    {
+      await LoadHistoryAsync();
+    }
+  }
+
+  private async Task LoadHistoryAsync()
+  {
+    if (_record is null || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    var version = ++_historyVersion;
+    _historyLoading = true;
+    _historyError = null;
+    try
+    {
+      var history = await RecordsApi.GetHistoryAsync(_record.Id, token);
+      if (!IsCurrent(token) || version != _historyVersion)
+      {
+        return;
+      }
+
+      _history = history;
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsCurrent(token) && version == _historyVersion)
+      {
+        _historyError = e.Message;
+      }
+    }
+    catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+    {
+      if (IsCurrent(token) && version == _historyVersion)
+      {
+        _historyError = "Не удалось загрузить историю. Повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token) && version == _historyVersion)
+      {
+        _historyLoading = false;
+      }
+    }
+  }
+
+  private void InvalidateHistory()
+  {
+    _historyVersion++;
+    _history = null;
+    _historyError = null;
+    _historyLoading = false;
+  }
+
+  private async Task BeginCreate()
+  {
+    _editing = true;
+    _authorId = null;
+    ClearActionMessages();
+    await EnsureEditDataAsync();
+  }
+
+  private async Task BeginEditAsync()
+  {
+    _editing = true;
+    _authorId = null;
+    _replaceId = null;
+    _selectedDiagnosisId = null;
+    _prescriptionText = "";
+    ClearActionMessages();
+    await EnsureEditDataAsync();
+  }
+
+  private async Task EnsureEditDataAsync()
+  {
+    if (_cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    var version = ++_editDataVersion;
+    try
+    {
+      // Загружаем справочники заново при каждом входе в редактирование,
+      // чтобы в выпадающих списках не оставались устаревшие варианты.
+      // Отдельный счётчик сеанса (_editDataVersion) защищает от гонки: запоздавший
+      // ответ прежнего входа в редактирование не перезаписывает свежий список.
+      var workers = await WorkersApi.ListAsync(includeDeleted: false, token);
+      if (!IsEditDataCurrent(token, version))
+      {
+        return;
+      }
+
+      _workers = workers;
+      if (_tab == Tab.Diagnoses)
+      {
+        var diagnoses = await DiagnosesApi.ListAsync(token);
+        if (!IsEditDataCurrent(token, version))
+        {
+          return;
+        }
+
+        _diagnoses = diagnoses;
+      }
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsEditDataCurrent(token, version))
+      {
+        _actionError = e.Message;
+      }
+    }
+    catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+    {
+      if (IsEditDataCurrent(token, version))
+      {
+        _actionError = "Не удалось загрузить справочные данные для редактирования.";
+      }
+    }
+  }
+
+  // Перезагружает справочники после ошибки устаревшего выбора
+  // (удалённый автор → 400, удалённый диагноз → 404), чтобы списки снова были актуальны.
+  private async Task RefreshEditDataAsync(CancellationToken token)
+  {
+    var version = ++_editDataVersion;
+    try
+    {
+      var workers = await WorkersApi.ListAsync(includeDeleted: false, token);
+      if (!IsEditDataCurrent(token, version))
+      {
+        return;
+      }
+
+      _workers = workers;
+      var diagnoses = await DiagnosesApi.ListAsync(token);
+      if (!IsEditDataCurrent(token, version))
+      {
+        return;
+      }
+
+      _diagnoses = diagnoses;
+    }
+    catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException
+                                or OperationCanceledException)
+    {
+      // Не удалось обновить справочники — оставляем прежние варианты, ошибка уже показана.
+    }
+  }
+
+  // Загрузка справочников актуальна, только если страница не освобождена, токен не отменён
+  // и за время запроса не начался новый сеанс редактирования (не изменился _editDataVersion).
+  private bool IsEditDataCurrent(CancellationToken token, int version) =>
+    IsCurrent(token) && version == _editDataVersion;
+
+  // Инвалидирует незавершённые загрузки справочников: любой запоздавший ответ отбрасывается.
+  private void InvalidateEditData()
+  {
+    _editDataVersion++;
+  }
+
+  private void CancelEdit()
+  {
+    ResetEditState();
+    ClearActionMessages();
+  }
+
+  private void ResetEditState()
+  {
+    InvalidateEditData();
+    _editing = false;
+    _authorId = null;
+    _selectedDiagnosisId = null;
+    _prescriptionText = "";
+    _replaceId = null;
+    _replaceText = "";
+  }
+
+  private void ClearActionMessages()
+  {
+    _actionError = null;
+    _actionNotice = null;
+    _recordConflict = false;
+  }
+
+  private void OnAuthorSelected(ChangeEventArgs args) =>
+    _authorId = Guid.TryParse(args.Value?.ToString(), out var id) ? id : null;
+
+  private void OnDiagnosisSelected(ChangeEventArgs args) =>
+    _selectedDiagnosisId = Guid.TryParse(args.Value?.ToString(), out var id) ? id : null;
+
+  private void BeginReplace(PrescriptionDto prescription)
+  {
+    _replaceId = prescription.Id;
+    _replaceText = prescription.Text;
+    _actionError = null;
+  }
+
+  private void CancelReplace()
+  {
+    _replaceId = null;
+    _replaceText = "";
+  }
+
+  private Task CreateRecordAsync() => RunMutationAsync((author, token) =>
+    RecordsApi.CreateAsync(PatientId, author, token));
+
+  private Task AddDiagnosisAsync() => RunMutationAsync((author, token) =>
+    RecordsApi.AddDiagnosisAsync(_record!.Id, _selectedDiagnosisId!.Value, author, token));
+
+  private Task RemoveDiagnosisAsync(Guid medicalRecordDiagnosisId) => RunMutationAsync((author, token) =>
+    RecordsApi.RemoveDiagnosisAsync(_record!.Id, medicalRecordDiagnosisId, author, token));
+
+  private Task AddPrescriptionAsync()
+  {
+    // Повторная проверка длины на случай обхода отключённой кнопки — запрос не уходит.
+    if (!IsPrescriptionTextValid(_prescriptionText))
+    {
+      _actionError = PrescriptionLengthMessage;
+      return Task.CompletedTask;
+    }
+
+    return RunMutationAsync((author, token) =>
+      RecordsApi.AddPrescriptionAsync(_record!.Id, _prescriptionText.Trim(), author, token));
+  }
+
+  private Task CancelPrescriptionAsync(Guid prescriptionId) => RunMutationAsync((author, token) =>
+    RecordsApi.CancelPrescriptionAsync(_record!.Id, prescriptionId, author, token));
+
+  private Task ReplacePrescriptionAsync(Guid prescriptionId)
+  {
+    if (!IsPrescriptionTextValid(_replaceText))
+    {
+      _actionError = PrescriptionLengthMessage;
+      return Task.CompletedTask;
+    }
+
+    return RunMutationAsync((author, token) =>
+      RecordsApi.ReplacePrescriptionAsync(_record!.Id, prescriptionId, _replaceText.Trim(), author, token));
+  }
+
+  // Длина назначения после Trim должна совпадать с серверными ограничениями (3–128 символов).
+  private static bool IsPrescriptionTextValid(string text)
+  {
+    var length = text.Trim().Length;
+    return length >= PrescriptionTextMinLength && length <= PrescriptionTextMaxLength;
+  }
+
+  private static string PrescriptionLengthMessage =>
+    $"Назначение должно содержать от {PrescriptionTextMinLength} до {PrescriptionTextMaxLength} символов.";
+
+  private async Task RunMutationAsync(Func<Guid, CancellationToken, Task> action)
+  {
+    if (_busy || _authorId is not { } author || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    _busy = true;
+    ClearActionMessages();
+    try
+    {
+      await action(author, token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      // Сохранение подтверждено: сразу очищаем форму и выходим из редактирования,
+      // чтобы повторная отправка не создала дубликат, даже если обновление карты ниже упадёт.
+      ResetEditState();
+      InvalidateHistory();
+      await RefreshAfterSaveAsync(token);
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsCurrent(token))
+      {
+        _actionError = e.Message;
+        if (e.StatusCode == HttpStatusCode.Conflict)
+        {
+          _recordConflict = true;
+        }
+        else if (e.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound)
+        {
+          // Вероятно, выбран устаревший автор (400) или диагноз (404) — обновляем справочники.
+          await RefreshEditDataAsync(token);
+        }
+      }
+    }
+    catch (HttpRequestException)
+    {
+      if (IsCurrent(token))
+      {
+        _actionError = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+      }
+    }
+    catch (TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _actionError = "Сервер не ответил вовремя. Обновите карту, чтобы проверить результат.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _busy = false;
+      }
+    }
+  }
+
+  private async Task RefreshAfterSaveAsync(CancellationToken token)
+  {
+    try
+    {
+      var record = await RecordsApi.FindForPatientAsync(PatientId, token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      _record = record;
+      if (_tab == Tab.History && _record is not null)
+      {
+        await LoadHistoryAsync();
+      }
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (Exception e) when (e is ApiException or HttpRequestException or TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _actionNotice = "Изменение сохранено, но обновить карту не удалось. Нажмите «Обновить карту».";
+      }
+    }
+  }
+
+  private async Task LoadSnapshotAsync()
+  {
+    if (_record is null || _snapshotBusy || _cts is null)
+    {
+      return;
+    }
+
+    if (_snapshotAt is not { } snapshotAt)
+    {
+      _snapshotError = "Укажите корректные дату и время.";
+      return;
+    }
+
+    var token = _cts.Token;
+    _snapshotBusy = true;
+    _snapshotError = null;
+    try
+    {
+      var local = DateTime.SpecifyKind(snapshotAt, DateTimeKind.Unspecified);
+      var at = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
+      _snapshot = await RecordsApi.GetSnapshotAsync(_record.Id, at, token);
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+      if (IsCurrent(token))
+      {
+        _snapshotError = "Выбранные дата и время вне допустимого диапазона.";
+      }
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException e)
+    {
+      if (IsCurrent(token))
+      {
+        _snapshotError = e.Message;
+      }
+    }
+    catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _snapshotError = "Не удалось получить историческое состояние. Повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _snapshotBusy = false;
+      }
+    }
+  }
+
+  private void ClearSnapshot()
+  {
+    _snapshot = null;
+    _snapshotError = null;
+  }
+
+  private RenderFragment AuthorSelect => @<div class="mr-author">
+    <label for="author-select">Автор изменения</label>
+    <select id="author-select" class="form-control" value="@(_authorId?.ToString() ?? "")" @onchange="OnAuthorSelected">
+      <option value="">— выберите медработника —</option>
+      @foreach (var worker in _workers ?? [])
+      {
+        <option value="@worker.Id">@worker.LastName @worker.FirstName — @worker.Position</option>
+      }
+    </select>
+    <p class="field-hint">Выберите активного медработника: он будет указан как автор изменения.</p>
+  </div>;
+
+  private RenderFragment ActionFeedback => @<text>
+    <ErrorAlert Message="@_actionError"/>
+    @if (_actionNotice is not null)
+    {
+      <div class="alert alert-warning" role="status">@_actionNotice</div>
+    }
+    @if (_recordConflict || _actionNotice is not null)
+    {
+      <button class="btn btn-outline-primary" disabled="@_busy" @onclick="ReloadAsync">Обновить карту</button>
+    }
+  </text>;
+
+  private string TabClass(Tab tab) => _tab == tab ? "mr-tab mr-tab-active" : "mr-tab";
+
+  private bool IsCurrent(CancellationToken token) => !_disposed && !token.IsCancellationRequested;
+
+  private static string SexLabel(AdministrativeSex sex) => sex switch
+  {
+    AdministrativeSex.Male => "М",
+    AdministrativeSex.Female => "Ж",
+    _ => "НУ"
+  };
+
+  private static string FormatLocal(DateTimeOffset value) =>
+    value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
+
+  private static string OffsetLabel
+  {
+    get
+    {
+      var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+      return $"UTC{(offset < TimeSpan.Zero ? "-" : "+")}{offset:hh\\:mm}";
+    }
+  }
+
+  private static string EventTitle(string eventType) => eventType switch
+  {
+    "MedicalRecordCreated" => "Карта создана",
+    "DiagnosisAdded" => "Добавлен диагноз",
+    "DiagnosisRemoved" => "Удалён диагноз",
+    "PrescriptionAdded" => "Добавлено назначение",
+    "PrescriptionCancelled" => "Отменено назначение",
+    _ => eventType
+  };
+
+  private static string DescribeEvent(MedicalRecordHistoryEventDto item)
+  {
+    try
+    {
+      using var document = JsonDocument.Parse(item.PayloadJson);
+      var root = document.RootElement;
+      return item.EventType switch
+      {
+        "MedicalRecordCreated" => "Электронная медицинская карта открыта.",
+        "DiagnosisAdded" or "DiagnosisRemoved" => $"{Text(root, "code")} · {Text(root, "name")}",
+        "PrescriptionAdded" => HasValue(root, "replacesPrescriptionId")
+          ? $"{Text(root, "text")} (замена предыдущего назначения)"
+          : Text(root, "text"),
+        "PrescriptionCancelled" => Text(root, "text"),
+        _ => item.PayloadJson
+      };
+    }
+    catch (JsonException)
+    {
+      return item.PayloadJson;
+    }
+  }
+
+  private static string Text(JsonElement root, string property) =>
+    root.TryGetProperty(property, out var value) ? value.GetString() ?? "" : "";
+
+  private static bool HasValue(JsonElement root, string property) =>
+    root.TryGetProperty(property, out var value) &&
+    value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
+
+  public void Dispose()
+  {
+    _disposed = true;
+    _cts?.Cancel();
+    _cts?.Dispose();
+  }
+}

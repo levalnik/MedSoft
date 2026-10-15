@@ -1,5 +1,6 @@
 @page "/admin/diagnoses"
 @using HospitalInformationSystem.Contracts.Diagnoses
+@implements IDisposable
 @inject DiagnosesApiClient Api
 
 <PageTitle>Диагнозы · Учебная HIS</PageTitle>
@@ -7,6 +8,9 @@
 <div class="page-heading">
   <div><h1>Справочник диагнозов</h1>
     <p>Коды и наименования для электронных медицинских карт.</p></div>
+  <button class="btn btn-primary" disabled="@(_saving || _deleting)" @onclick="BeginCreate">
+    <Icon Name="plus"/>
+    Добавить диагноз</button>
 </div>
 
 <section class="surface diagnosis-import" aria-labelledby="import-title" aria-busy="@_importing">
@@ -39,6 +43,62 @@
   </div>
 </section>
 
+@if (_formOpen)
+{
+  <section class="surface" aria-label="@(_editingId is null ? "Новый диагноз" : "Редактирование диагноза")">
+    <div class="registry-heading">
+      <div>
+        <h2>@(_editingId is null ? "Новый диагноз" : "Редактирование диагноза")</h2>
+        <p>Код — ровно 6 символов, название — от 3 до 24 символов. Код и название должны быть уникальны.</p>
+      </div>
+      <span class="section-index">@(_editingId is null ? "НОВЫЙ" : "ПРАВКА")</span>
+    </div>
+    <EditForm Model="_form" OnValidSubmit="SaveAsync">
+      <DataAnnotationsValidator/>
+      <fieldset disabled="@_saving">
+        <div class="form-grid">
+          <div>
+            <label for="diagnosis-code">Код</label>
+            <InputText id="diagnosis-code" class="form-control" @bind-Value="_form.Code" maxlength="6"
+                       placeholder="Например, A00.00"/>
+            <ValidationMessage For="() => _form.Code"/>
+          </div>
+          <div>
+            <label for="diagnosis-name">Наименование</label>
+            <InputText id="diagnosis-name" class="form-control" @bind-Value="_form.Name" maxlength="24"
+                       placeholder="Например, Холера"/>
+            <ValidationMessage For="() => _form.Name"/>
+          </div>
+        </div>
+        <ErrorAlert Message="@_formError"/>
+        <div class="form-actions">
+          <button type="button" class="btn btn-light" disabled="@_saving" @onclick="CancelForm">Отмена</button>
+          <button type="submit" class="btn btn-primary">
+            <Icon Name="check"/> @(_saving ? "Сохранение…" : "Сохранить")
+          </button>
+        </div>
+      </fieldset>
+    </EditForm>
+  </section>
+}
+
+@if (_pendingDelete is not null)
+{
+  <div class="confirm-panel" role="alertdialog" aria-labelledby="diagnosis-delete-title">
+    <div>
+      <strong id="diagnosis-delete-title">Удалить диагноз из справочника?</strong>
+      <p><code>@_pendingDelete.Code</code> @_pendingDelete.Name — записи в уже созданных медкартах сохранятся.</p>
+    </div>
+    <ErrorAlert Message="@_deleteError"/>
+    <div class="button-row">
+      <button class="btn btn-danger" disabled="@_deleting" @onclick="DeleteAsync">
+        @(_deleting ? "Удаление…" : "Удалить")
+      </button>
+      <button class="btn btn-light" disabled="@_deleting" @onclick="CancelDelete">Отмена</button>
+    </div>
+  </div>
+}
+
 <ErrorAlert Message="@_listError"/>
 <section class="surface" aria-label="Список диагнозов">
   <div class="registry-heading">
@@ -64,18 +124,29 @@
   else
   {
     <div class="table-responsive">
-      <table class="table diagnosis-table">
+      <table class="table mr-table">
         <thead>
         <tr>
           <th scope="col">Код</th>
           <th scope="col">Наименование</th>
+          <th scope="col" class="actions-cell">Действия</th>
         </tr>
         </thead>
         <tbody>@foreach (var diagnosis in VisibleDiagnoses)
         {
           <tr @key="diagnosis.Id">
-            <td><code>@diagnosis.Code</code></td>
-            <td>@diagnosis.Name</td>
+            <td data-label="Код"><code>@diagnosis.Code</code></td>
+            <td data-label="Наименование">@diagnosis.Name</td>
+            <td class="actions-cell">
+              <button class="icon-button" title="Редактировать диагноз" disabled="@(_saving || _deleting)"
+                      aria-label="Редактировать: @diagnosis.Code @diagnosis.Name" @onclick="() => BeginEdit(diagnosis)">
+                <Icon Name="edit"/>
+              </button>
+              <button class="icon-button danger" title="Удалить диагноз" disabled="@(_saving || _deleting)"
+                      aria-label="Удалить: @diagnosis.Code @diagnosis.Name" @onclick="() => AskDelete(diagnosis)">
+                <Icon Name="delete"/>
+              </button>
+            </td>
           </tr>
         }
         </tbody>
@@ -101,31 +172,189 @@
   private bool _loading = true;
   private bool _importing;
 
+  private readonly DiagnosisForm _form = new();
+  private Guid? _editingId;
+  private bool _formOpen;
+  private bool _saving;
+  private string? _formError;
+  private DiagnosisDefinitionDto? _pendingDelete;
+  private bool _deleting;
+  private string? _deleteError;
+  private CancellationTokenSource? _cts;
+  private int _loadVersion;
+  private bool _disposed;
+
   private IEnumerable<DiagnosisDefinitionDto> VisibleDiagnoses => (_diagnoses ?? [])
     .Where(x => $"{x.Code} {x.Name}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
 
-  protected override Task OnInitializedAsync() => LoadAsync();
+  protected override Task OnInitializedAsync()
+  {
+    _cts = new CancellationTokenSource();
+    return LoadAsync();
+  }
+
+  private void BeginCreate()
+  {
+    if (_saving || _deleting)
+    {
+      return;
+    }
+
+    _editingId = null;
+    _form.Code = "";
+    _form.Name = "";
+    _formError = null;
+    _formOpen = true;
+  }
+
+  private void BeginEdit(DiagnosisDefinitionDto diagnosis)
+  {
+    if (_saving || _deleting)
+    {
+      return;
+    }
+
+    _editingId = diagnosis.Id;
+    _form.Code = diagnosis.Code;
+    _form.Name = diagnosis.Name;
+    _formError = null;
+    _formOpen = true;
+  }
+
+  private void CancelForm()
+  {
+    _formOpen = false;
+    _formError = null;
+  }
+
+  private void AskDelete(DiagnosisDefinitionDto diagnosis)
+  {
+    if (_saving || _deleting)
+    {
+      return;
+    }
+
+    _pendingDelete = diagnosis;
+    _deleteError = null;
+  }
+
+  private void CancelDelete()
+  {
+    _pendingDelete = null;
+    _deleteError = null;
+  }
+
+  private async Task SaveAsync()
+  {
+    if (_saving || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    _saving = true;
+    _formError = null;
+    try
+    {
+      var request = new SaveDiagnosisRequest(_form.Code.Trim(), _form.Name.Trim());
+      if (_editingId is { } id)
+      {
+        await Api.UpdateAsync(id, request, token);
+      }
+      else
+      {
+        await Api.CreateAsync(request, token);
+      }
+
+      _formOpen = false;
+      await LoadAsync();
+    }
+    catch (ApiException e)
+    {
+      _formError = e.Message;
+    }
+    catch (HttpRequestException)
+    {
+      _formError = "Не удалось связаться с сервером. Введённые данные сохранены в форме.";
+    }
+    catch (TaskCanceledException)
+    {
+      _formError = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат.";
+    }
+    finally
+    {
+      _saving = false;
+    }
+  }
+
+  private async Task DeleteAsync()
+  {
+    if (_pendingDelete is null || _deleting || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    _deleting = true;
+    _deleteError = null;
+    try
+    {
+      await Api.DeleteAsync(_pendingDelete.Id, token);
+      _pendingDelete = null;
+      await LoadAsync();
+    }
+    catch (ApiException e)
+    {
+      _deleteError = e.Message;
+    }
+    catch (HttpRequestException)
+    {
+      _deleteError = "Не удалось связаться с сервером.";
+    }
+    catch (TaskCanceledException)
+    {
+      _deleteError = "Сервер не ответил вовремя. Обновите список, чтобы проверить результат.";
+    }
+    finally
+    {
+      _deleting = false;
+    }
+  }
 
   private void SelectFile(InputFileChangeEventArgs args)
   {
     _file = null;
     _result = null;
     _importError = null;
-    if (args.File.Size == 0) _importError = "Выбранный файл пуст.";
-    else if (args.File.Size > DiagnosisImportLimits.MaxFileBytes) _importError = "Размер файла не должен превышать 1 МиБ.";
-    else _file = args.File;
+    if (args.File.Size == 0)
+    {
+      _importError = "Выбранный файл пуст.";
+    }
+    else if (args.File.Size > DiagnosisImportLimits.MaxFileBytes)
+    {
+      _importError = "Размер файла не должен превышать 1 МиБ.";
+    }
+    else
+    {
+      _file = args.File;
+    }
   }
 
   private async Task ImportAsync()
   {
-    if (_file is null || _importing || _loading) return;
+    if (_file is null || _importing || _loading || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
     _importing = true;
     _importError = null;
     _result = null;
     try
     {
       await using var stream = _file.OpenReadStream(DiagnosisImportLimits.MaxFileBytes);
-      _result = await Api.ImportAsync(stream, _file.Name);
+      _result = await Api.ImportAsync(stream, _file.Name, token);
       await LoadAsync();
     }
     catch (ApiException e)
@@ -152,28 +381,73 @@
 
   private async Task LoadAsync()
   {
+    if (_cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    var version = ++_loadVersion;
     _loading = true;
     _listError = null;
     try
     {
-      _diagnoses = await Api.ListAsync();
+      var diagnoses = await Api.ListAsync(token);
+      if (!IsCurrent(token) || version != _loadVersion)
+      {
+        return;
+      }
+
+      _diagnoses = diagnoses;
     }
     catch (ApiException e)
     {
-      _listError = e.Message;
+      if (version == _loadVersion)
+      {
+        _listError = e.Message;
+      }
     }
     catch (HttpRequestException)
     {
-      _listError = "Не удалось обновить список: сервер недоступен.";
+      if (version == _loadVersion)
+      {
+        _listError = "Не удалось обновить список: сервер недоступен.";
+      }
     }
     catch (TaskCanceledException)
     {
-      _listError = "Не удалось обновить список: сервер не ответил вовремя.";
+      if (version == _loadVersion)
+      {
+        _listError = "Не удалось обновить список: сервер не ответил вовремя.";
+      }
     }
     finally
     {
-      _loading = false;
+      if (version == _loadVersion)
+      {
+        _loading = false;
+      }
     }
+  }
+
+  private bool IsCurrent(CancellationToken token) => !_disposed && !token.IsCancellationRequested;
+
+  public void Dispose()
+  {
+    _disposed = true;
+    _cts?.Cancel();
+    _cts?.Dispose();
+  }
+
+  private sealed class DiagnosisForm
+  {
+    [Required(ErrorMessage = "Укажите код диагноза.")]
+    [StringLength(6, MinimumLength = 6, ErrorMessage = "Код диагноза: ровно 6 символов.")]
+    public string Code { get; set; } = "";
+
+    [Required(ErrorMessage = "Укажите название диагноза.")]
+    [StringLength(24, MinimumLength = 3, ErrorMessage = "Название: от 3 до 24 символов.")]
+    public string Name { get; set; } = "";
   }
 
 }

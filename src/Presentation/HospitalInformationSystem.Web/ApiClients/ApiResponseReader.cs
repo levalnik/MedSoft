@@ -24,7 +24,7 @@ internal static class ApiResponseReader
         }
         catch (JsonException exception)
         {
-            throw new ApiException(InvalidResponseMessage, exception);
+            throw new ApiException(InvalidResponseMessage, innerException: exception);
         }
     }
 
@@ -39,7 +39,10 @@ internal static class ApiResponseReader
 
     public static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        if (response.IsSuccessStatusCode) return;
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
 
         ProblemResponse? problem = null;
         try
@@ -60,7 +63,7 @@ internal static class ApiResponseReader
             : !string.IsNullOrWhiteSpace(problem?.Detail) ? problem.Detail
             : !string.IsNullOrWhiteSpace(problem?.Title) ? problem.Title
             : $"Ошибка сервера: {(int)response.StatusCode}.";
-        throw new ApiException(message);
+        throw new ApiException(message, response.StatusCode);
     }
 
     private sealed record ProblemResponse(string? Title, string? Detail, Dictionary<string, string[]?>? Errors);

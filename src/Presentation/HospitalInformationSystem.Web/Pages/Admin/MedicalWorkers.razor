@@ -1,4 +1,5 @@
 @page "/admin/medical-workers"
+@implements IDisposable
 @inject MedicalWorkersApiClient Api
 
 <PageTitle>Медработники · Учебная HIS</PageTitle>
@@ -118,36 +119,68 @@
   private bool _includeDeleted = true;
   private bool _loading = true;
   private bool _deleting;
+  private CancellationTokenSource? _cts;
+  private int _loadVersion;
+  private bool _disposed;
 
   private IEnumerable<MedicalWorkerDto> VisibleWorkers => (_workers ?? [])
     .Where(x => (_includeDeleted || !x.IsDeleted) &&
                 $"{x.LastName} {x.FirstName} {x.Position}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
 
-  protected override Task OnInitializedAsync() => LoadAsync();
+  protected override Task OnInitializedAsync()
+  {
+    _cts = new CancellationTokenSource();
+    return LoadAsync();
+  }
 
   private async Task LoadAsync()
   {
+    if (_cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    var version = ++_loadVersion;
     _loading = true;
     _error = null;
     try
     {
-      _workers = await Api.ListAsync(includeDeleted: true);
+      var workers = await Api.ListAsync(includeDeleted: true, token);
+      if (!IsCurrent(token) || version != _loadVersion)
+      {
+        return;
+      }
+
+      _workers = workers;
     }
     catch (ApiException e)
     {
-      _error = e.Message;
+      if (version == _loadVersion)
+      {
+        _error = e.Message;
+      }
     }
     catch (HttpRequestException)
     {
-      _error = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+      if (version == _loadVersion)
+      {
+        _error = "Сервер недоступен. Проверьте, запущено ли приложение API.";
+      }
     }
     catch (TaskCanceledException)
     {
-      _error = "Сервер не ответил вовремя. Повторите попытку.";
+      if (version == _loadVersion)
+      {
+        _error = "Сервер не ответил вовремя. Повторите попытку.";
+      }
     }
     finally
     {
-      _loading = false;
+      if (version == _loadVersion)
+      {
+        _loading = false;
+      }
     }
   }
 
@@ -155,13 +188,18 @@
 
   private async Task DeleteAsync()
   {
-    if (_pendingDelete is null || _deleting) return;
+    if (_pendingDelete is null || _deleting || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
     _deleting = true;
     _error = null;
     try
     {
       var deletedId = _pendingDelete.Id;
-      await Api.DeleteAsync(deletedId);
+      await Api.DeleteAsync(deletedId, token);
       _workers = _workers?.Select(worker => worker.Id == deletedId ? worker with { IsDeleted = true } : worker).ToArray();
       _pendingDelete = null;
       await LoadAsync();
@@ -182,6 +220,15 @@
     {
       _deleting = false;
     }
+  }
+
+  private bool IsCurrent(CancellationToken token) => !_disposed && !token.IsCancellationRequested;
+
+  public void Dispose()
+  {
+    _disposed = true;
+    _cts?.Cancel();
+    _cts?.Dispose();
   }
 
 }

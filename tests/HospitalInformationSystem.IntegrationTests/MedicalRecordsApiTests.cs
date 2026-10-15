@@ -448,6 +448,27 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
             PostgresErrorCodes.CheckViolation, prescription.Id);
     }
 
+    [Fact]
+    public async Task Deleting_catalog_diagnosis_keeps_active_record_diagnosis_snapshot_and_history()
+    {
+        var worker = await CreateWorker();
+        var record = await CreateRecord(await CreatePatient(), worker);
+        var definition = await CreateDiagnosis();
+        var added = await AddDiagnosis(record.Id, definition, worker);
+        var before = await Current(record.Id);
+        var historyBefore = await History(record.Id);
+
+        await Expect(await _client.DeleteAsync($"/api/diagnoses/{definition}"), HttpStatusCode.NoContent);
+
+        var after = await Current(record.Id);
+        after.Diagnoses.Should()
+            .ContainSingle(x => x.Id == added.Id && x.Code == added.Code && x.Name == added.Name);
+        after.Version.Should().Be(before.Version);
+        (await History(record.Id)).Should().Equal(historyBefore);
+        (await Snapshot(record.Id, factory.Clock.GetUtcNow())).Diagnoses.Should()
+            .ContainSingle(x => x.Id == added.Id && x.Code == added.Code && x.Name == added.Name);
+    }
+
     private async Task<Guid> CreateWorker() => (await Read<IdView>(await _client.PostAsJsonAsync("/api/medical-workers",
         new { FirstName = "Алексей", LastName = "Орлов", Position = "Врач" }), HttpStatusCode.Created)).Id;
 

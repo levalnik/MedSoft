@@ -14,4 +14,6 @@ builder.Services.AddScoped(_ => new HttpClient
 });
 builder.Services.AddScoped<MedicalWorkersApiClient>();
 builder.Services.AddScoped<DiagnosesApiClient>();
+builder.Services.AddScoped<PatientsApiClient>();
+builder.Services.AddScoped<MedicalRecordsApiClient>();
 await builder.Build().RunAsync();
