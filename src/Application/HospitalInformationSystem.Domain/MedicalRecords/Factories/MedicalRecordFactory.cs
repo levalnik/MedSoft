@@ -18,7 +18,7 @@ public static class MedicalRecordFactory
         return new MedicalRecord
         {
             Id = id, PatientId = patientId, CreatedAtUtc = at, Version = 1,
-            HistoryEvents = Array.AsReadOnly(new[] { created })
+            HistoryEvents = Array.AsReadOnly([created])
         };
     }
 }

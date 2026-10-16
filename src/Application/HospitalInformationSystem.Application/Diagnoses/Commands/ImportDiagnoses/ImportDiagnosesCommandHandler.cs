@@ -31,9 +31,9 @@ public sealed class ImportDiagnosesCommandHandler(
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!codes.Add(row.Code))
-                errors.Add(new($"file[{row.Line}].Code", $"Строка {row.Line}: повтор кода {row.Code}."));
+                errors.Add(new ValidationFailure($"file[{row.Line}].Code", $"Строка {row.Line}: повтор кода {row.Code}."));
             if (!names.Add(row.Name))
-                errors.Add(new($"file[{row.Line}].Name", $"Строка {row.Line}: повтор названия {row.Name}."));
+                errors.Add(new ValidationFailure($"file[{row.Line}].Name", $"Строка {row.Line}: повтор названия {row.Name}."));
             try
             {
                 candidates.Add((row, DiagnosisDefinitionFactory.Create(row.Code, row.Name, now)));

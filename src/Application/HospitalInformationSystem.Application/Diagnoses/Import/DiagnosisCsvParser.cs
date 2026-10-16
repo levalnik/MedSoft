@@ -39,9 +39,7 @@ public static class DiagnosisCsvParser
             rows.Add(new DiagnosisCsvRow(line, fields[0].Trim(), fields[1].Trim()));
         }
 
-        if (rows.Count == 0)
-            throw Error(1, "Добавьте хотя бы один диагноз после заголовка.");
-        return rows;
+        return rows.Count == 0 ? throw Error(1, "Добавьте хотя бы один диагноз после заголовка.") : rows;
     }
 
     private static string[]? ReadFields(TextFieldParser parser)
@@ -56,6 +54,6 @@ public static class DiagnosisCsvParser
         }
     }
 
-    internal static ValidationException Error(long line, string message) =>
+    private static ValidationException Error(long line, string message) =>
         new([new ValidationFailure($"file[{line}]", $"Строка {line}: {message}")]);
 }
