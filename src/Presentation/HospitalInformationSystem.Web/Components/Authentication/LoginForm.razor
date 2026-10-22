@@ -1,0 +1,103 @@
+@implements IDisposable
+@inject HospitalInformationSystem.Web.Gateways.IAuthenticationGateway Authentication
+@inject NavigationManager Navigation
+
+<section class="surface login-card" aria-labelledby="login-title">
+  <div class="registry-heading">
+    <div>
+      <span class="eyebrow">УЧЕБНАЯ HIS</span>
+      <h1 id="login-title">@(IsAdministrator ? "Вход администратора" : "Вход медработника")</h1>
+      <p>@(IsAdministrator
+        ? "Войдите для управления сотрудниками, справочниками и учётными записями."
+        : "Войдите для работы с пациентами и медицинскими картами.")</p>
+    </div>
+  </div>
+  <EditForm Model="_form" OnValidSubmit="LoginAsync">
+    <DataAnnotationsValidator/>
+    <fieldset disabled="@_busy" aria-busy="@_busy">
+      <legend class="visually-hidden">Учётные данные</legend>
+      <div class="mr-field">
+        <label for="user-name">Логин</label>
+        <InputText id="user-name" class="form-control" @bind-Value="_form.UserName" autocomplete="username"
+                   autocapitalize="none" spellcheck="false" maxlength="64"/>
+        <ValidationMessage For="() => _form.UserName"/>
+      </div>
+      <div class="mr-field">
+        <label for="password">Пароль</label>
+        <InputText id="password" type="password" class="form-control" @bind-Value="_form.Password"
+                   autocomplete="current-password" maxlength="128"/>
+        <ValidationMessage For="() => _form.Password"/>
+      </div>
+      <ErrorAlert Message="@_error"/>
+      <button type="submit" class="btn btn-primary">@(_busy ? "Вход…" : "Войти")</button>
+    </fieldset>
+  </EditForm>
+  <p class="portal-switch">
+    <a href="@(IsAdministrator ? "/login" : "/admin/login")">
+      @(IsAdministrator ? "Вход для медработников" : "Вход для администратора")
+    </a>
+  </p>
+</section>
+
+@code {
+  [Parameter] public LoginPortal Portal { get; set; }
+  [Parameter] public string? ReturnUrl { get; set; }
+
+  private readonly Credentials _form = new();
+  private readonly CancellationTokenSource _cancellation = new();
+  private bool _busy;
+  private string? _error;
+  private bool IsAdministrator => Portal == LoginPortal.Administrator;
+
+  private async Task LoginAsync()
+  {
+    if (_busy)
+      return;
+
+    _busy = true;
+    _error = null;
+    try
+    {
+      await Authentication.LoginAsync(new LoginRequest(_form.UserName.Trim(), _form.Password, Portal: Portal),
+        _cancellation.Token);
+      if (!_cancellation.IsCancellationRequested)
+        Navigation.NavigateTo(LoginNavigation.GetReturnPath(Portal, ReturnUrl), replace: true);
+    }
+    catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+    {
+    }
+    catch (ApiException exception)
+    {
+      _error = exception.StatusCode == System.Net.HttpStatusCode.Unauthorized
+        ? "Не удалось войти. Проверьте учётные данные и выбранный раздел входа."
+        : exception.Message;
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+    {
+      _error = "Сервер недоступен. Повторите попытку входа.";
+    }
+    finally
+    {
+      _form.Password = "";
+      _busy = false;
+    }
+  }
+
+  public void Dispose()
+  {
+    _form.Password = "";
+    _cancellation.Cancel();
+    _cancellation.Dispose();
+  }
+
+  private sealed class Credentials
+  {
+    [Required(ErrorMessage = "Укажите логин.")]
+    [StringLength(64, ErrorMessage = "Логин: не более 64 символов.")]
+    public string UserName { get; set; } = "";
+
+    [Required(ErrorMessage = "Укажите пароль.")]
+    [StringLength(128, ErrorMessage = "Пароль: не более 128 символов.")]
+    public string Password { get; set; } = "";
+  }
+}

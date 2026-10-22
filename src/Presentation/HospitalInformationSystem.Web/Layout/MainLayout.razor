@@ -4,6 +4,7 @@
 @inject SessionState Session
 @inject SessionApiClient SessionsApi
 
+<UiMockPanel/>
 <div class="app-shell">
   <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="app-header">
@@ -74,8 +75,9 @@
     _logoutError = null;
     try
     {
+      var loginPath = Session.Current?.Role == ApplicationRoles.Administrator ? "/admin/login" : "/login";
       await SessionsApi.LogoutAsync(CancellationToken.None);
-      Navigation.NavigateTo("/login", replace: true);
+      Navigation.NavigateTo(loginPath, replace: true);
     }
     catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
     {

@@ -1031,7 +1031,7 @@ else
   };
 
   private static string FormatLocal(DateTimeOffset value) =>
-    value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
+    value.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture);
 
   private static string OffsetLabel
   {
