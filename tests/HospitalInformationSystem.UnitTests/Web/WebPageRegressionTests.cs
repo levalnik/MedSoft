@@ -4,11 +4,13 @@ using System.Reflection;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.Auth;
 using HospitalInformationSystem.Contracts.Diagnoses;
+using HospitalInformationSystem.Contracts.Lab2;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Contracts.Patients;
 using HospitalInformationSystem.Web.ApiClients;
 using HospitalInformationSystem.Web.Authentication;
+using HospitalInformationSystem.Web.Gateways;
 using HospitalInformationSystem.Web.Pages.Admin;
 using HospitalInformationSystem.Web.Pages.Medical;
 
@@ -157,64 +159,43 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task An_older_account_list_response_cannot_hide_a_newly_created_account()
+    public async Task An_older_account_list_response_cannot_overwrite_a_newer_one()
     {
         var staleResponse = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var administrator = new AccountDto(Guid.NewGuid(), "admin", ApplicationRoles.Administrator, null, false);
-        var created = new AccountDto(Guid.NewGuid(), "doctor", ApplicationRoles.MedicalWorker, Guid.NewGuid(), false);
-        var accountRequests = 0;
-        using var http = CreateClient((request, _) => request.RequestUri!.AbsolutePath == "/api/accounts"
-            ? ++accountRequests == 1 ? staleResponse.Task : Task.FromResult(Json(new[] { administrator, created }))
-            : Task.FromResult(Json(Array.Empty<MedicalWorkerDto>())));
+        var administrator = Lab2Account("admin", ApplicationRoles.Administrator, null, null);
+        var doctor = Lab2Account("doctor.demo", ApplicationRoles.MedicalWorker, "Иванов Иван", MedicalWorkerRole.Doctor);
+        var requests = 0;
+        using var http = CreateClient((_, _) => ++requests == 1
+            ? staleResponse.Task
+            : Task.FromResult(Json(new[] { administrator, doctor })));
         using var page = new Accounts();
-        Inject(page, "Api", new AccountsApiClient(http));
-        Inject(page, "WorkersApi", new MedicalWorkersApiClient(http));
+        Inject(page, "Gateway", new AccountManagementGateway(http));
 
         var olderLoad = InvokeAsync(page, "LoadAsync");
         await InvokeAsync(page, "LoadAsync");
         staleResponse.SetResult(Json(new[] { administrator }));
         await olderLoad;
 
-        Get<IReadOnlyList<AccountDto>>(page, "_accounts").Should().Equal(administrator, created);
+        Get<IReadOnlyList<Lab2AccountDto>>(page, "_accounts").Should().Equal(administrator, doctor);
         Get<bool>(page, "_loading").Should().BeFalse();
     }
 
     [Fact]
-    public async Task Account_creation_is_blocked_while_the_account_list_is_refreshing()
+    public void An_operation_result_updates_the_matching_account_without_a_reload()
     {
-        using var http = CreateClient((_, _) => throw new InvalidOperationException("Creation during refresh is blocked."));
+        var doctor = Lab2Account("doctor.demo", ApplicationRoles.MedicalWorker, "Иванов Иван", MedicalWorkerRole.Doctor);
         using var page = new Accounts();
-        Inject(page, "Api", new AccountsApiClient(http));
-        Set(page, "_loading", true);
+        Set(page, "_accounts", new[] { doctor });
 
-        await InvokeAsync(page, "CreateAsync");
+        Invoke(page, "OnAccountChanged", doctor with { IsActive = false });
 
-        Get<bool>(page, "_saving").Should().BeFalse();
+        Get<IReadOnlyList<Lab2AccountDto>>(page, "_accounts").Single().IsActive.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(ApplicationRoles.Administrator, false, false, null, "Активен")]
-    [InlineData(ApplicationRoles.Administrator, true, false, null, "Временно заблокирован")]
-    [InlineData(ApplicationRoles.MedicalWorker, false, true, false, "Активен")]
-    [InlineData(ApplicationRoles.MedicalWorker, false, true, true, "Сотрудник удалён")]
-    [InlineData(ApplicationRoles.MedicalWorker, true, true, true, "Временно заблокирован")]
-    [InlineData(ApplicationRoles.MedicalWorker, false, true, null, "Нет действующего сотрудника")]
-    [InlineData(ApplicationRoles.MedicalWorker, false, false, false, "Нет действующего сотрудника")]
-    [InlineData(ApplicationRoles.MedicalWorker, true, false, null, "Временно заблокирован")]
-    public void Account_status_reflects_lockout_and_the_linked_workers_availability(
-        string role, bool isLockedOut, bool hasWorkerLink, bool? workerDeleted, string expected)
-    {
-        var workerId = Guid.NewGuid();
-        var account = new AccountDto(Guid.NewGuid(), "account", role, hasWorkerLink ? workerId : null, isLockedOut);
-        using var page = new Accounts();
-        Set(page, "_workers", workerDeleted is { } isDeleted
-            ? new[] { new MedicalWorkerDto(workerId, "Иван", "Иванов", "Врач", isDeleted) }
-            : Array.Empty<MedicalWorkerDto>());
-
-        var status = Invoke(page, "AccountStatus", account);
-
-        status.Should().Be(expected);
-    }
+    private static Lab2AccountDto Lab2Account(string userName, string accountRole, string? workerName,
+        MedicalWorkerRole? role) =>
+        new(Guid.NewGuid(), userName, accountRole, workerName is null ? null : Guid.NewGuid(), workerName, role,
+            true, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
 
     private static HttpClient CreateClient(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) =>
         new(new ResponseHandler(send)) { BaseAddress = new Uri("http://localhost/") };
