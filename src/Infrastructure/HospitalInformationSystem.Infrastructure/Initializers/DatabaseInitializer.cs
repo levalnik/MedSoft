@@ -18,7 +18,7 @@ public sealed class DatabaseInitializer(HospitalDbContext db, TimeProvider timeP
         ("I10.00", "Гипертензия")
     ];
 
-    public async Task InitializeAsync(bool seed, CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(bool seed, CancellationToken cancellationToken)
     {
         await db.Database.MigrateAsync(cancellationToken);
         if (!seed)

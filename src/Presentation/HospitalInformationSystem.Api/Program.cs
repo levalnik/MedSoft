@@ -55,7 +55,7 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrations"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>()
-        .InitializeAsync(app.Configuration.GetValue<bool>("Database:Seed"));
+        .InitializeAsync(app.Configuration.GetValue<bool>("Database:Seed"), CancellationToken.None);
 }
 
 var bootstrapUserName = app.Configuration["Authentication:BootstrapAdmin:UserName"];

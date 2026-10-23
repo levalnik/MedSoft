@@ -20,18 +20,18 @@ try
         throw new InvalidOperationException("Задайте ConnectionStrings__Postgres или локальный appsettings.Local.json API. Запускайте команду из корня репозитория.");
     var options = new DbContextOptionsBuilder<HospitalDbContext>().UseNpgsql(connectionString).Options;
     await using var db = new HospitalDbContext(options);
-    var service = new Lab2UpgradeService(db, TimeProvider.System);
+    var service = new SecurityUpgradeService(db, TimeProvider.System);
     var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true, UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
     if (args[0] == "apply")
     {
-        var plan = JsonSerializer.Deserialize<Lab2UpgradePlan>(await File.ReadAllTextAsync(args[1]), jsonOptions)
+        var plan = JsonSerializer.Deserialize<SecurityUpgradePlan>(await File.ReadAllTextAsync(args[1]), jsonOptions)
             ?? throw new ArgumentException("Пустой план перехода.");
-        await service.ApplyAsync(plan);
+        await service.ApplyAsync(plan, CancellationToken.None);
         Console.WriteLine("План применён. Предметные данные и UUID сохранены. KDF/TOTP/JWT подключаются следующими этапами.");
     }
     else
     {
-        var json = JsonSerializer.Serialize(await service.ReportAsync(), jsonOptions);
+        var json = JsonSerializer.Serialize(await service.ReportAsync(CancellationToken.None), jsonOptions);
         if (args.Length == 2) await File.WriteAllTextAsync(args[1], json + Environment.NewLine);
         else Console.WriteLine(json);
     }

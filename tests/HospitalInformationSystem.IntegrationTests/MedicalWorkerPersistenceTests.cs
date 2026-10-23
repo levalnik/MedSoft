@@ -18,7 +18,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 public sealed class MedicalWorkerPersistenceTests(HospitalApiFactory factory) : IClassFixture<HospitalApiFactory>
 {
     [Fact]
-    public async Task Domain_changes_survive_dbo_round_trips_without_resetting_identity_or_timestamps()
+    public async Task Save_DomainChanges_ShouldPreserveIdentityAndTimestampsAcrossDboRoundTrips()
     {
         var createdAt = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
         var updatedAt = createdAt.AddHours(1);

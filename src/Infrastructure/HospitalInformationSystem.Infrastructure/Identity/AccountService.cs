@@ -79,7 +79,7 @@ public sealed class AccountService(
         if (roles.Length != 1 || roles[0] is not (ApplicationRoles.Administrator or ApplicationRoles.MedicalWorker) ||
             user.IsAdministrator != (roles[0] == ApplicationRoles.Administrator))
             return null;
-        HospitalInformationSystem.Contracts.Lab2.MedicalWorkerRole? medicalRole = null;
+        HospitalInformationSystem.Contracts.Security.MedicalWorkerRole? medicalRole = null;
         if (roles[0] == ApplicationRoles.MedicalWorker)
         {
             if (user.MedicalWorkerId is not { } workerId)
@@ -90,10 +90,10 @@ public sealed class AccountService(
                 return null;
             medicalRole = worker.Role switch
             {
-                MedicalWorkerRole.Doctor => HospitalInformationSystem.Contracts.Lab2.MedicalWorkerRole.Doctor,
-                MedicalWorkerRole.LaboratoryTechnician => HospitalInformationSystem.Contracts.Lab2.MedicalWorkerRole.LaboratoryTechnician,
-                MedicalWorkerRole.Nurse => HospitalInformationSystem.Contracts.Lab2.MedicalWorkerRole.Nurse,
-                MedicalWorkerRole.Other => HospitalInformationSystem.Contracts.Lab2.MedicalWorkerRole.Other,
+                MedicalWorkerRole.Doctor => HospitalInformationSystem.Contracts.Security.MedicalWorkerRole.Doctor,
+                MedicalWorkerRole.LaboratoryTechnician => HospitalInformationSystem.Contracts.Security.MedicalWorkerRole.LaboratoryTechnician,
+                MedicalWorkerRole.Nurse => HospitalInformationSystem.Contracts.Security.MedicalWorkerRole.Nurse,
+                MedicalWorkerRole.Other => HospitalInformationSystem.Contracts.Security.MedicalWorkerRole.Other,
                 _ => null
             };
             if (medicalRole is null)

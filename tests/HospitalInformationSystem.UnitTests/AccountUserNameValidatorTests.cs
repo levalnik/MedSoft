@@ -13,7 +13,7 @@ public sealed class AccountUserNameValidatorTests
     [InlineData("Логин", false)]
     [InlineData("a b", false)]
     [InlineData(null, false)]
-    public void Shared_username_rules_preserve_the_identity_allowed_alphabet(string? name, bool valid)
+    public void ValidateUserName_SharedRules_ShouldPreserveAllowedAlphabet(string? name, bool valid)
     {
         AccountUserNameRules.IsValid(name).Should().Be(valid);
     }
@@ -25,7 +25,7 @@ public sealed class AccountUserNameValidatorTests
     [InlineData("abc", true)]
     [InlineData("abcdefghijklmnop", true)]
     [InlineData("abcdefghijklmnopq", false)]
-    public async Task Identity_validates_the_same_user_name_length_as_the_account_service(string? name, bool valid)
+    public async Task ValidateAsync_BoundaryLengths_ShouldMatchAccountServiceRules(string? name, bool valid)
     {
         var result = await new AccountUserNameValidator().ValidateAsync(null!, new HospitalUser { UserName = name });
 

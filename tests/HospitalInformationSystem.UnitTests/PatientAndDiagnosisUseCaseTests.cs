@@ -26,7 +26,7 @@ public sealed class PatientAndDiagnosisUseCaseTests
             AdministrativeSex.Female, null, DateTimeOffset.UnixEpoch);
 
     [Fact]
-    public async Task Patient_with_record_cannot_be_deleted()
+    public async Task DeletePatient_ExistingMedicalRecord_ShouldRejectDeletion()
     {
         var patient = NewPatient();
         var repository = new Mock<IPatientRepository>();
@@ -44,7 +44,7 @@ public sealed class PatientAndDiagnosisUseCaseTests
     }
 
     [Fact]
-    public async Task Patient_without_record_is_physically_deleted_and_saved()
+    public async Task DeletePatient_NoMedicalRecord_ShouldDeleteAndSave()
     {
         var patient = NewPatient();
         var repository = new Mock<IPatientRepository>();
@@ -60,7 +60,7 @@ public sealed class PatientAndDiagnosisUseCaseTests
     }
 
     [Fact]
-    public async Task List_enriches_patient_status_in_one_presence_query()
+    public async Task ListPatients_ExistingPatients_ShouldEnrichStatusWithOnePresenceQuery()
     {
         var first = NewPatient();
         var second = NewPatient();
@@ -81,7 +81,7 @@ public sealed class PatientAndDiagnosisUseCaseTests
     }
 
     [Fact]
-    public async Task Update_explicitly_copies_domain_changes_to_repository_before_saving()
+    public async Task UpdatePatient_ValidChanges_ShouldCopyDomainChangesBeforeSaving()
     {
         var patient = NewPatient();
         var now = DateTimeOffset.UnixEpoch.AddDays(1);
@@ -111,7 +111,7 @@ public sealed class PatientAndDiagnosisUseCaseTests
     }
 
     [Fact]
-    public async Task Duplicate_diagnosis_is_rejected_without_save()
+    public async Task CreateDiagnosis_DuplicateCode_ShouldRejectWithoutSaving()
     {
         var repository = new Mock<IDiagnosisRepository>();
         repository.Setup(x => x.ExistsConflictAsync("A00.00", "Холера", null, CancellationToken.None))

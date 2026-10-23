@@ -36,7 +36,7 @@ public sealed class HospitalDbContext(DbContextOptions<HospitalDbContext> option
     }
 
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         RejectHistoryChanges();
         UpdateAccountTimestamps();

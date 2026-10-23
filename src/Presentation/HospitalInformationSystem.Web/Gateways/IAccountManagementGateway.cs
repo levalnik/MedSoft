@@ -1,14 +1,14 @@
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 
 namespace HospitalInformationSystem.Web.Gateways;
 
 public interface IAccountManagementGateway
 {
-    Task<IReadOnlyList<Lab2AccountDto>> ListAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AccountDetailsDto>> ListAsync(CancellationToken cancellationToken);
     Task<CreateWorkerAccountResultDto> CreateForWorkerAsync(Guid medicalWorkerId,
-        CreateWorkerAccountRequest request, CancellationToken cancellationToken = default);
+        CreateWorkerAccountRequest request, CancellationToken cancellationToken);
     Task<ResetAccountPasswordResultDto> ResetPasswordAsync(Guid accountId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken);
     Task<SetAccountActiveResultDto> SetActiveAsync(Guid accountId, bool isActive,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken);
 }

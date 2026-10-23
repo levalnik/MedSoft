@@ -15,7 +15,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
     [Theory]
     [InlineData(LoginPortal.Administrator, HttpStatusCode.OK)]
     [InlineData(LoginPortal.MedicalWorker, HttpStatusCode.Unauthorized)]
-    public async Task The_selected_portal_does_not_change_the_administrators_actual_role(
+    public async Task Login_SelectedPortal_ShouldPreserveActualAdministratorRole(
         LoginPortal portal, HttpStatusCode expected)
     {
         using var client = factory.CreateCookieClient();
@@ -34,7 +34,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
     }
 
     [Fact]
-    public async Task A_medical_worker_cannot_enter_the_administrator_portal_with_a_valid_password()
+    public async Task Login_MedicalWorkerAtAdministratorPortal_ShouldRejectValidCredentials()
     {
         using var administrator = factory.CreateCookieClient();
         await SetCsrfAsync(administrator);
@@ -68,7 +68,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
     }
 
     [Fact]
-    public async Task The_cookie_backend_does_not_silently_accept_an_unverified_totp_code()
+    public async Task Login_CookieBackendWithTotpCode_ShouldRejectUnverifiedCode()
     {
         using var client = factory.CreateCookieClient();
         await SetCsrfAsync(client);

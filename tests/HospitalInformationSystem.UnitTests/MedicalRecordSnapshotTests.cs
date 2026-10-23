@@ -37,7 +37,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Replay_reconstructs_each_step_T0_to_T4_at_inclusive_boundaries()
+    public void Build_InclusiveEventBoundaries_ShouldReconstructEveryState()
     {
         var (record, diagnosis, original, replacement) = Scenario();
 
@@ -70,7 +70,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Before_event_uses_previous_state_and_after_last_event_uses_final_state()
+    public void Build_BetweenAndAfterEvents_ShouldReturnApplicableState()
     {
         var (record, _, original, replacement) = Scenario();
         var justBefore = MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents, T4.AddTicks(-1));
@@ -86,7 +86,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Before_creation_is_not_found_instead_of_an_empty_record()
+    public void Build_BeforeCreation_ShouldReturnNotFound()
     {
         var (record, _, _, _) = Scenario();
         var snapshot = () => MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents, T0.AddTicks(-1));
@@ -94,7 +94,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Equal_timestamps_are_replayed_by_version_not_input_order()
+    public void Build_EqualTimestamps_ShouldOrderEventsByVersion()
     {
         var author = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", T0);
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, T0);
@@ -108,7 +108,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Replay_uses_payload_even_if_current_state_and_catalog_reference_are_missing()
+    public void Build_MissingCurrentStateAndCatalog_ShouldUseEventPayload()
     {
         var (record, diagnosis, original, _) = Scenario();
         var withoutCurrentState = new MedicalRecord
@@ -130,7 +130,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Missing_versions_and_unknown_event_types_are_rejected()
+    public void Build_MissingVersionsAndUnknownTypes_ShouldRejectHistory()
     {
         var (record, _, _, _) = Scenario();
         var missingVersion = () =>
@@ -146,7 +146,7 @@ public sealed class MedicalRecordSnapshotTests
     [InlineData("{")]
     [InlineData("null")]
     [InlineData("{}")]
-    public void Corrupt_or_incomplete_payload_is_rejected(string payload)
+    public void Build_CorruptOrIncompletePayload_ShouldRejectHistory(string payload)
     {
         var (record, _, _, _) = Scenario();
         var corrupt = ReplaceEvent(record.HistoryEvents.ElementAt(1), payload: payload);
@@ -155,7 +155,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Other_record_events_are_rejected_instead_of_polluting_snapshot()
+    public void Build_EventsFromOtherRecord_ShouldRejectHistory()
     {
         var (record, _, _, _) = Scenario();
         var other = ReplaceEvent(record.HistoryEvents.First(), recordId: Guid.NewGuid());
@@ -164,7 +164,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Missing_tail_of_history_is_rejected_instead_of_returning_an_outdated_snapshot()
+    public void Build_MissingHistoryTail_ShouldRejectOutdatedSnapshot()
     {
         var (record, _, _, _) = Scenario();
         var snapshot = () => MedicalRecordSnapshotReplay.Build(record, record.HistoryEvents.SkipLast(1), T4);
@@ -173,7 +173,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Historical_snapshot_also_rejects_a_gap_in_later_history()
+    public void Build_GapAfterRequestedTime_ShouldRejectHistory()
     {
         var (record, _, _, _) = Scenario();
         var snapshot = () =>
@@ -186,7 +186,7 @@ public sealed class MedicalRecordSnapshotTests
     [InlineData("{")]
     [InlineData("null")]
     [InlineData("{}")]
-    public void Historical_snapshot_rejects_corrupted_payload_in_later_history(string payload)
+    public void Build_CorruptPayloadAfterRequestedTime_ShouldRejectHistory(string payload)
     {
         var (record, _, _, _) = Scenario();
         var history = record.HistoryEvents.Select(item => item.Version == 3
@@ -199,7 +199,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Historical_snapshot_rejects_unknown_type_in_later_history()
+    public void Build_UnknownTypeAfterRequestedTime_ShouldRejectHistory()
     {
         var (record, _, _, _) = Scenario();
         var history = record.HistoryEvents.Select(item => item.Version == 3
@@ -212,7 +212,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Historical_snapshot_rejects_invalid_state_transition_in_later_history()
+    public void Build_InvalidTransitionAfterRequestedTime_ShouldRejectHistory()
     {
         var (record, _, _, _) = Scenario();
         var history = record.HistoryEvents.Select(item => item.Version == 3
@@ -225,7 +225,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public void Replay_rejects_two_replacements_of_the_same_prescription()
+    public void Build_DuplicatePrescriptionReplacements_ShouldRejectHistory()
     {
         var author = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", T0);
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, T0);
@@ -242,7 +242,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public async Task Builder_returns_not_found_for_missing_record()
+    public async Task BuildAsync_MissingRecord_ShouldReturnNotFound()
     {
         var repository = new Mock<IMedicalRecordRepository>();
         var builder = new MedicalRecordSnapshotBuilder(repository.Object);
@@ -251,7 +251,7 @@ public sealed class MedicalRecordSnapshotTests
     }
 
     [Fact]
-    public async Task Builder_reads_without_tracking_and_returns_replayed_state()
+    public async Task BuildAsync_ExistingRecord_ShouldReadWithoutTrackingAndReplayState()
     {
         var (record, _, original, _) = Scenario();
         var repository = new Mock<IMedicalRecordRepository>(MockBehavior.Strict);

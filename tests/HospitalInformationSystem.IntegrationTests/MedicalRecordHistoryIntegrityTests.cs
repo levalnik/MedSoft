@@ -13,7 +13,7 @@ public sealed class MedicalRecordHistoryIntegrityTests
     [Theory]
     [InlineData(EntityState.Modified)]
     [InlineData(EntityState.Deleted)]
-    public async Task Existing_history_cannot_be_updated_or_deleted_through_async_unit_of_work(EntityState state)
+    public async Task SaveChangesAsync_ExistingHistoryUpdateOrDelete_ShouldRejectMutation(EntityState state)
     {
         await using var db = CreateContext();
         db.Entry(ExistingEvent()).State = state;
@@ -26,7 +26,7 @@ public sealed class MedicalRecordHistoryIntegrityTests
     [Theory]
     [InlineData(EntityState.Modified)]
     [InlineData(EntityState.Deleted)]
-    public void Existing_history_cannot_be_updated_or_deleted_through_sync_unit_of_work(EntityState state)
+    public void SaveChanges_ExistingHistoryUpdateOrDelete_ShouldRejectMutation(EntityState state)
     {
         using var db = CreateContext();
         db.Entry(ExistingEvent()).State = state;

@@ -16,7 +16,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 public sealed class PersistenceMigrationTests
 {
     [Fact]
-    public async Task Moving_to_dbo_preserves_data_written_before_the_migration()
+    public async Task Migrate_ExistingDomainTables_ShouldPreserveDataWhenMovingToDbo()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await postgres.StartAsync();

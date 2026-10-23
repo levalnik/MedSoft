@@ -1,12 +1,12 @@
 using System.Globalization;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 
 namespace HospitalInformationSystem.Web.Gateways;
 
 public sealed class AuditGateway(HttpClient http) : IAuditGateway
 {
     public async Task<PagedResult<AuditEventDto>> ListAsync(AuditQuery query,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         if (query.Page < 1) throw new ArgumentOutOfRangeException(nameof(query), "Номер страницы должен быть положительным.");
@@ -27,7 +27,7 @@ public sealed class AuditGateway(HttpClient http) : IAuditGateway
         }
         if (query.From is { } from) values.Add($"from={EncodeDate(from)}");
         if (query.To is { } to) values.Add($"to={EncodeDate(to)}");
-        var page = await Lab2ApiTransport.SendAsync<PagedResult<AuditEventDto>>(http, HttpMethod.Get,
+        var page = await GatewayHttpTransport.SendAsync<PagedResult<AuditEventDto>>(http, HttpMethod.Get,
             $"api/audit?{string.Join('&', values)}", null, cancellationToken);
         if (page.Items.Any(item => item is null))
             throw new ApiClients.ApiException("Сервер вернул некорректный список событий аудита.");

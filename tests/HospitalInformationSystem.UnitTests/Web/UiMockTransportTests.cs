@@ -1,9 +1,10 @@
+using System.Threading;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.Auth;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Contracts.Patients;
 using HospitalInformationSystem.Web.ApiClients;
@@ -21,24 +22,24 @@ public sealed class UiMockTransportTests
     [InlineData(UiMockPersona.Nurse, ApplicationRoles.MedicalWorker, MedicalWorkerRole.Nurse)]
     [InlineData(UiMockPersona.LaboratoryTechnician, ApplicationRoles.MedicalWorker, MedicalWorkerRole.LaboratoryTechnician)]
     [InlineData(UiMockPersona.Other, ApplicationRoles.MedicalWorker, MedicalWorkerRole.Other)]
-    public async Task Persona_updates_the_same_session_used_by_the_application(UiMockPersona persona,
+    public async Task SetPersona_KnownPersona_ShouldUpdateApplicationSession(UiMockPersona persona,
         string accountRole, MedicalWorkerRole? medicalRole)
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(persona);
 
-        var result = await fixture.Auth.GetSessionAsync();
+        var result = await fixture.Auth.GetSessionAsync(CancellationToken.None);
 
         result!.AccountRole.Should().Be(accountRole);
         result.MedicalWorkerRole.Should().Be(medicalRole);
         fixture.Session.Current!.Id.Should().Be(result.Id);
         fixture.State.Reset();
         fixture.Session.Current.Should().BeNull();
-        (await fixture.Auth.GetSessionAsync()).Should().BeNull();
+        (await fixture.Auth.GetSessionAsync(CancellationToken.None)).Should().BeNull();
     }
 
     [Fact]
-    public async Task Existing_catalog_client_is_stateful_and_accepts_short_names_for_lab2()
+    public async Task SaveWorker_ShortNames_ShouldPersistStateInCatalog()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Administrator);
@@ -60,7 +61,7 @@ public sealed class UiMockTransportTests
     [InlineData(UiMockPersona.Nurse, true)]
     [InlineData(UiMockPersona.LaboratoryTechnician, false)]
     [InlineData(UiMockPersona.Other, false)]
-    public async Task Read_only_roles_can_browse_but_only_nurse_and_doctor_can_create_patients(
+    public async Task CreatePatient_MedicalRoles_ShouldAllowOnlyNurseAndDoctor(
         UiMockPersona persona, bool canCreate)
     {
         using var fixture = new Fixture();
@@ -75,7 +76,7 @@ public sealed class UiMockTransportTests
     }
 
     [Fact]
-    public async Task Nurse_can_create_a_record_but_cannot_change_medical_contents()
+    public async Task CreateMedicalRecord_NurseRole_ShouldCreateRecordAndRejectContentChanges()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Nurse);
@@ -93,7 +94,7 @@ public sealed class UiMockTransportTests
     }
 
     [Fact]
-    public async Task Prescription_replacement_preserves_history_and_historical_state()
+    public async Task ReplacePrescription_ExistingPrescription_ShouldPreserveHistoryAndHistoricalState()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Doctor);
@@ -123,88 +124,88 @@ public sealed class UiMockTransportTests
     }
 
     [Fact]
-    public async Task Mock_login_does_not_accept_an_account_from_the_other_portal()
+    public async Task Login_AccountFromOtherPortal_ShouldRejectAuthentication()
     {
         using var fixture = new Fixture();
         var action = () => fixture.Auth.LoginAsync(new LoginRequest("doctor.demo", UiMockState.DemonstrationPassword,
-            Portal: LoginPortal.Administrator));
+            Portal: LoginPortal.Administrator), CancellationToken.None);
 
         (await action.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         fixture.Session.Current.Should().BeNull();
         var session = await fixture.Auth.LoginAsync(new LoginRequest("doctor.demo", UiMockState.DemonstrationPassword,
-            Portal: LoginPortal.MedicalWorker));
+            Portal: LoginPortal.MedicalWorker), CancellationToken.None);
         session.MedicalWorkerRole.Should().Be(MedicalWorkerRole.Doctor);
     }
 
     [Fact]
-    public async Task Failed_relogin_cannot_leave_hidden_access_after_client_session_was_cleared()
+    public async Task Login_FailedRelogin_ShouldNotLeaveHiddenAccess()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Administrator);
-        var login = () => fixture.Auth.LoginAsync(new LoginRequest("admin.demo", "wrong-password"));
+        var login = () => fixture.Auth.LoginAsync(new LoginRequest("admin.demo", "wrong-password"), CancellationToken.None);
 
         await login.Should().ThrowAsync<ApiException>();
 
         fixture.Session.Current.Should().BeNull();
-        (await fixture.Auth.GetSessionAsync()).Should().BeNull();
+        (await fixture.Auth.GetSessionAsync(CancellationToken.None)).Should().BeNull();
         var patients = () => new PatientsApiClient(fixture.Http).ListAsync(CancellationToken.None);
         (await patients.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task Account_operations_return_one_time_passwords_and_activity_is_enforced()
+    public async Task ManageAccounts_ValidOperations_ShouldReturnOneTimePasswordsAndEnforceActivity()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Administrator);
         var worker = await new MedicalWorkersApiClient(fixture.Http).SaveAsync(null,
             new SaveMedicalWorkerRequest("Иван", "Учебный", "Врач", MedicalWorkerRole.Doctor), CancellationToken.None);
         var accounts = new AccountManagementGateway(fixture.Http);
-        var invalid = () => accounts.CreateForWorkerAsync(worker.Id, new CreateWorkerAccountRequest(new string('a', 17)));
+        var invalid = () => accounts.CreateForWorkerAsync(worker.Id, new CreateWorkerAccountRequest(new string('a', 17)), CancellationToken.None);
         (await invalid.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        var created = await accounts.CreateForWorkerAsync(worker.Id, new CreateWorkerAccountRequest("new.doctor"));
+        var created = await accounts.CreateForWorkerAsync(worker.Id, new CreateWorkerAccountRequest("new.doctor"), CancellationToken.None);
         created.GeneratedPassword.Should().HaveLength(12).And.MatchRegex("^[A-Za-z0-9]+$");
         created.GeneratedPassword.Should().MatchRegex("[A-Z]").And.MatchRegex("[a-z]").And.MatchRegex("[0-9]");
-        var reset = await accounts.ResetPasswordAsync(created.Account.Id);
+        var reset = await accounts.ResetPasswordAsync(created.Account.Id, CancellationToken.None);
         reset.GeneratedPassword.Should().HaveLength(12);
         reset.GeneratedPassword.Should().MatchRegex("[A-Z]").And.MatchRegex("[a-z]").And.MatchRegex("[0-9]");
         reset.GeneratedPassword.Should().NotBe(created.GeneratedPassword);
-        (await accounts.SetActiveAsync(created.Account.Id, false)).Account.IsActive.Should().BeFalse();
-        await fixture.Auth.LogoutAsync();
-        var login = () => fixture.Auth.LoginAsync(new LoginRequest("new.doctor", reset.GeneratedPassword));
+        (await accounts.SetActiveAsync(created.Account.Id, false, CancellationToken.None)).Account.IsActive.Should().BeFalse();
+        await fixture.Auth.LogoutAsync(CancellationToken.None);
+        var login = () => fixture.Auth.LoginAsync(new LoginRequest("new.doctor", reset.GeneratedPassword), CancellationToken.None);
         (await login.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         fixture.State.SwitchPersona(UiMockPersona.Administrator);
-        await accounts.SetActiveAsync(created.Account.Id, true);
-        await fixture.Auth.LogoutAsync();
-        (await fixture.Auth.LoginAsync(new LoginRequest("new.doctor", reset.GeneratedPassword)))
+        await accounts.SetActiveAsync(created.Account.Id, true, CancellationToken.None);
+        await fixture.Auth.LogoutAsync(CancellationToken.None);
+        (await fixture.Auth.LoginAsync(new LoginRequest("new.doctor", reset.GeneratedPassword), CancellationToken.None))
             .MedicalWorkerId.Should().Be(worker.Id);
         fixture.State.Reset();
         fixture.Session.Current.Should().BeNull();
     }
 
     [Fact]
-    public async Task Setup_requires_a_live_challenge_and_finishes_without_signing_in()
+    public async Task CompleteSetup_LiveChallenge_ShouldCompleteWithoutSigningIn()
     {
         using var fixture = new Fixture();
         fixture.State.SetupRequired = true;
-        (await fixture.Auth.GetSetupStatusAsync()).SetupRequired.Should().BeTrue();
+        (await fixture.Auth.GetSetupStatusAsync(CancellationToken.None)).SetupRequired.Should().BeTrue();
         var noChallenge = () => fixture.Auth.ConfirmSetupAsync(
-            new ConfirmSetupRequest(Guid.Empty, UiMockState.DemonstrationTotpCode), UiMockState.SetupToken);
+            new ConfirmSetupRequest(Guid.Empty, UiMockState.DemonstrationTotpCode), UiMockState.SetupToken, CancellationToken.None);
         (await noChallenge.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         const string password = "Different-demo-password!2026";
-        var challenge = await fixture.Auth.BeginSetupAsync(new BeginSetupRequest(password, password), UiMockState.SetupToken);
+        var challenge = await fixture.Auth.BeginSetupAsync(new BeginSetupRequest(password, password), UiMockState.SetupToken, CancellationToken.None);
 
         await fixture.Auth.ConfirmSetupAsync(new ConfirmSetupRequest(challenge.ChallengeId,
-            UiMockState.DemonstrationTotpCode), UiMockState.SetupToken);
+            UiMockState.DemonstrationTotpCode), UiMockState.SetupToken, CancellationToken.None);
 
-        (await fixture.Auth.GetSetupStatusAsync()).SetupRequired.Should().BeFalse();
+        (await fixture.Auth.GetSetupStatusAsync(CancellationToken.None)).SetupRequired.Should().BeFalse();
         fixture.Session.Current.Should().BeNull();
-        (await fixture.Auth.LoginAsync(new LoginRequest("admin.demo", password))).AccountRole
+        (await fixture.Auth.LoginAsync(new LoginRequest("admin.demo", password), CancellationToken.None)).AccountRole
             .Should().Be(ApplicationRoles.Administrator);
     }
 
     [Fact]
-    public async Task Csv_import_is_atomic_and_repeatable_without_using_a_database()
+    public async Task ImportDiagnoses_RepeatedAndInvalidCsv_ShouldRemainAtomicWithoutDatabase()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Administrator);
@@ -226,7 +227,7 @@ public sealed class UiMockTransportTests
     [InlineData(HttpStatusCode.Forbidden)]
     [InlineData(HttpStatusCode.Conflict)]
     [InlineData(HttpStatusCode.TooManyRequests)]
-    public async Task One_shot_error_is_consumed_by_the_operation_not_by_csrf(HttpStatusCode status)
+    public async Task Send_OneShotError_ShouldConsumeErrorInOperationInsteadOfCsrf(HttpStatusCode status)
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Administrator);
@@ -241,7 +242,7 @@ public sealed class UiMockTransportTests
     }
 
     [Fact]
-    public async Task Audit_filters_and_pagination_use_the_same_state_as_mutations()
+    public async Task ListAudit_MutationsAndFilters_ShouldShareStateAndPaginate()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Administrator);
@@ -249,9 +250,9 @@ public sealed class UiMockTransportTests
             new SaveMedicalWorkerRequest("Иван", "Учебный", "Врач"), CancellationToken.None);
         var audit = new AuditGateway(fixture.Http);
 
-        var first = await audit.ListAsync(new AuditQuery(PageSize: 1, EventType: AuditEventType.MedicalWorkerCreated));
+        var first = await audit.ListAsync(new AuditQuery(PageSize: 1, EventType: AuditEventType.MedicalWorkerCreated), CancellationToken.None);
         var second = await audit.ListAsync(new AuditQuery(Page: 2, PageSize: 1,
-            EventType: AuditEventType.MedicalWorkerCreated));
+            EventType: AuditEventType.MedicalWorkerCreated), CancellationToken.None);
 
         first.Items.Should().ContainSingle();
         first.HasMore.Should().BeTrue();
@@ -261,7 +262,7 @@ public sealed class UiMockTransportTests
     }
 
     [Fact]
-    public async Task Unknown_endpoints_terminate_in_the_mock_and_cancellation_is_respected()
+    public async Task Send_UnknownEndpointOrCancellation_ShouldStopInMockAndRespectCancellation()
     {
         using var fixture = new Fixture();
         fixture.State.SwitchPersona(UiMockPersona.Administrator);

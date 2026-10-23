@@ -13,7 +13,7 @@ public sealed class MedicalWorkerTests
     private static readonly DateTimeOffset Now = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Create_trims_fields_and_stores_utc_timestamps()
+    public void Create_ValidFields_ShouldTrimTextAndStoreUtcTimestamps()
     {
         var worker = MedicalWorkerFactory.Create(" Алексей ", " Иванов ", " Врач-терапевт ",
             Now.ToOffset(TimeSpan.FromHours(3)));
@@ -33,7 +33,7 @@ public sealed class MedicalWorkerTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("1234567890123456789012345")]
-    public void Invalid_worker_fields_are_rejected(string? value)
+    public void Create_InvalidFields_ShouldRejectInput(string? value)
     {
         Action firstName = () => MedicalWorkerFactory.Create(value!, "Иванов", "Врач", Now);
         Action lastName = () => MedicalWorkerFactory.Create("Алексей", value!, "Врач", Now);
@@ -46,7 +46,7 @@ public sealed class MedicalWorkerTests
     [Theory]
     [InlineData(3)]
     [InlineData(24)]
-    public void Boundary_lengths_are_accepted(int length)
+    public void Create_BoundaryLengths_ShouldAcceptInput(int length)
     {
         var text = new string('а', length);
         var worker = MedicalWorkerFactory.Create(text, text, text, Now);
@@ -56,7 +56,7 @@ public sealed class MedicalWorkerTests
     [Theory]
     [InlineData("А", "Б")]
     [InlineData(" Аб ", " Вг ")]
-    public void Short_names_are_accepted_but_short_positions_are_rejected(string firstName, string lastName)
+    public void Create_ShortNamesAndPosition_ShouldAcceptNamesAndRejectPosition(string firstName, string lastName)
     {
         var worker = MedicalWorkerFactory.Create(firstName, lastName, "Врач", Now);
         worker.FirstName.Should().Be(firstName.Trim());
@@ -70,7 +70,7 @@ public sealed class MedicalWorkerTests
     [InlineData(MedicalWorkerRole.Nurse)]
     [InlineData(MedicalWorkerRole.LaboratoryTechnician)]
     [InlineData(MedicalWorkerRole.Other)]
-    public void Factory_and_service_preserve_the_explicit_role(MedicalWorkerRole role)
+    public void CreateAndUpdate_ExplicitRole_ShouldPreserveRole(MedicalWorkerRole role)
     {
         var worker = MedicalWorkerFactory.Create("А", "Б", "Врач", Now, role);
         worker.Role.Should().Be(role);
@@ -81,7 +81,7 @@ public sealed class MedicalWorkerTests
     }
 
     [Fact]
-    public void Invalid_role_does_not_partially_change_entity()
+    public void Update_InvalidRole_ShouldPreserveEntity()
     {
         var worker = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now, MedicalWorkerRole.Doctor);
         var update = () => MedicalWorkerService.Update(worker, "Мария", "Петрова", "Сестра", Now.AddDays(1),
@@ -95,7 +95,7 @@ public sealed class MedicalWorkerTests
     }
 
     [Fact]
-    public void Invalid_update_does_not_partially_change_entity()
+    public void Update_InvalidFields_ShouldPreserveEntity()
     {
         var worker = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now);
         Action update = () => MedicalWorkerService.Update(worker, "Дмитрий", "Петров", "x", Now.AddDays(1));
@@ -106,7 +106,7 @@ public sealed class MedicalWorkerTests
     }
 
     [Fact]
-    public void Deletion_is_idempotent_and_update_does_not_restore_worker()
+    public void Delete_RepeatedDeletionAndUpdate_ShouldRemainDeleted()
     {
         var worker = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now);
         var originalId = worker.Id;

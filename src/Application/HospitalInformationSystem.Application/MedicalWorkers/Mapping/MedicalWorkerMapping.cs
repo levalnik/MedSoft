@@ -12,8 +12,8 @@ internal static partial class MedicalWorkerMapping
     public static partial MedicalWorkerDto ToDto(this MedicalWorker worker);
 
     [MapEnum(EnumMappingStrategy.ByName)]
-    public static partial MedicalWorkerRole ToDomain(this Contracts.Lab2.MedicalWorkerRole role);
+    public static partial MedicalWorkerRole ToDomain(this Contracts.Security.MedicalWorkerRole role);
 
     [MapEnum(EnumMappingStrategy.ByName)]
-    public static partial Contracts.Lab2.MedicalWorkerRole ToContract(this MedicalWorkerRole role);
+    public static partial Contracts.Security.MedicalWorkerRole ToContract(this MedicalWorkerRole role);
 }

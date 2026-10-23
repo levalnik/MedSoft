@@ -24,7 +24,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     private readonly HttpClient _client = factory.CreateBusinessClient();
 
     [Fact]
-    public async Task Import_creates_updates_and_repeats_without_changing_ids_or_timestamps()
+    public async Task Import_ValidRepeatedFile_ShouldCreateUpdateAndPreserveIdentityAndTimestamps()
     {
         var code = Guid.NewGuid().ToString("N")[..6];
         var secondCode = Guid.NewGuid().ToString("N")[..6];
@@ -59,7 +59,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     [InlineData("Code,Name\nT10002,Первый\n T10002 ,Второй")]
     [InlineData("Code,Name\nT10003,Первый\nT10004, Первый ")]
     [InlineData("Code,Name\nT10005,Первый\nT10006,\"Незакрыто")]
-    public async Task Invalid_file_returns_400_and_leaves_database_unchanged(string csv)
+    public async Task Import_InvalidFile_ShouldReturnBadRequestWithoutDatabaseChanges(string csv)
     {
         var before = await _client.GetFromJsonAsync<DiagnosisDefinitionDto[]>("/api/diagnoses");
         var response = await ImportAsync(csv);
@@ -69,7 +69,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Database_name_conflict_does_not_save_earlier_update_or_insert()
+    public async Task Import_DatabaseNameConflict_ShouldRollBackEarlierUpdatesAndInserts()
     {
         var token = Guid.NewGuid().ToString("N");
         var code = token[..6];
@@ -84,7 +84,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Database_failure_rolls_back_updates_and_inserts_across_batches()
+    public async Task Import_DatabaseFailure_ShouldRollBackChangesAcrossBatches()
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
@@ -117,7 +117,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Missing_empty_non_utf8_and_oversized_files_are_rejected()
+    public async Task Import_MissingEmptyInvalidEncodingOrOversizedFile_ShouldRejectFile()
     {
         using var missing = new MultipartFormDataContent();
         (await _client.PostAsync("/api/diagnoses/import", missing)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -128,7 +128,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Updating_many_rows_uses_one_catalog_read()
+    public async Task Import_ManyUpdatedRows_ShouldReadCatalogOnce()
     {
         var codes = Enumerable.Range(0, 25).Select(i => $"Q{i:D5}").ToArray();
         (await ImportAsync("Code,Name\n" + string.Join("\n", codes.Select(code => $"{code},До {code}"))))
@@ -150,7 +150,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Concurrent_imports_of_the_same_new_code_roll_back_the_losing_file()
+    public async Task Import_ConcurrentFilesWithSameNewCode_ShouldRollBackLosingFile()
     {
         const string sharedCode = "Y00001";
         const string firstCode = "Y00002";
@@ -201,7 +201,7 @@ public sealed class DiagnosisImportApiTests(HospitalApiFactory factory) : IClass
         }
 
         public override async ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command,
-            CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+            CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken)
         {
             if (command.CommandText.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) &&
                 command.CommandText.Contains("FROM diagnosis_definitions", StringComparison.Ordinal))

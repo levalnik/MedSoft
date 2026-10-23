@@ -11,8 +11,8 @@ public sealed class IdentityBootstrapper(
     UserManager<HospitalUser> users,
     AccountService accounts)
 {
-    public async Task InitializeAsync(string? userName = null, string? password = null,
-        CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(string? userName, string? password,
+        CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(1296385107, 1)", cancellationToken);

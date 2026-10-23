@@ -22,7 +22,7 @@ public sealed class WebPageRegressionTests
     [InlineData("\"text\"")]
     [InlineData("{\"text\":42}")]
     [InlineData("{\"text\":{}}")]
-    public void Unexpected_history_payload_shapes_do_not_break_the_page(string payload)
+    public void ReadHistory_UnexpectedPayloadShape_ShouldKeepPageUsable(string payload)
     {
         var item = new MedicalRecordHistoryEventDto(1, DateTimeOffset.UtcNow, Guid.NewGuid(), "Доктор", "Врач",
             "PrescriptionAdded", null, payload);
@@ -34,7 +34,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Failed_list_refresh_does_not_bring_back_a_deleted_patient()
+    public async Task RefreshPatients_FailedRefreshAfterDeletion_ShouldKeepPatientDeleted()
     {
         var patient = new PatientDto(Guid.NewGuid(), "Иван", "Иванов", null, new DateOnly(2000, 1, 1),
             AdministrativeSex.Male, null);
@@ -55,7 +55,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Failed_list_refresh_preserves_a_successfully_created_diagnosis()
+    public async Task RefreshDiagnoses_FailedRefreshAfterCreation_ShouldKeepCreatedDiagnosis()
     {
         var diagnosis = new DiagnosisDefinitionDto(Guid.NewGuid(), "A00.00", "Холера");
         using var http = CreateClient((request, _) => Task.FromResult(request.Method == HttpMethod.Post
@@ -77,7 +77,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Catalog_import_prevents_overlapping_edits_and_deletes()
+    public async Task ImportDiagnoses_ImportInProgress_ShouldPreventOverlappingEditsAndDeletes()
     {
         var diagnosis = new DiagnosisDefinitionDto(Guid.NewGuid(), "A00.00", "Холера");
         using var http = CreateClient((_, _) => throw new InvalidOperationException("No write is allowed during import."));
@@ -99,7 +99,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Medical_record_author_list_contains_only_the_signed_in_worker()
+    public async Task LoadAuthors_SignedInMedicalWorker_ShouldReturnOnlyCurrentWorker()
     {
         var current = new MedicalWorkerDto(Guid.NewGuid(), "Иван", "Иванов", "Терапевт", false);
         var other = new MedicalWorkerDto(Guid.NewGuid(), "Пётр", "Петров", "Хирург", false);
@@ -122,7 +122,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Refreshing_edit_choices_clears_deleted_author_and_diagnosis()
+    public async Task RefreshEditChoices_DeletedAuthorAndDiagnosis_ShouldClearSelections()
     {
         using var http = CreateClient((_, _) => Task.FromResult(Json(Array.Empty<object>())));
         using var page = new MedicalRecord();
@@ -140,7 +140,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Changing_the_selected_author_cannot_submit_a_different_workers_identity()
+    public async Task SaveRecord_ChangedAuthorSelection_ShouldPreventIdentityForgery()
     {
         var state = new SessionState();
         state.SetSession(new SessionDto(Guid.NewGuid(), "doctor", ApplicationRoles.MedicalWorker, Guid.NewGuid()));
@@ -157,7 +157,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task An_older_account_list_response_cannot_hide_a_newly_created_account()
+    public async Task RefreshAccounts_OlderResponse_ShouldPreserveNewlyCreatedAccount()
     {
         var staleResponse = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         var administrator = new AccountDto(Guid.NewGuid(), "admin", ApplicationRoles.Administrator, null, false);
@@ -180,7 +180,7 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Account_creation_is_blocked_while_the_account_list_is_refreshing()
+    public async Task CreateAccount_ListRefreshInProgress_ShouldBlockCreation()
     {
         using var http = CreateClient((_, _) => throw new InvalidOperationException("Creation during refresh is blocked."));
         using var page = new Accounts();
@@ -201,7 +201,7 @@ public sealed class WebPageRegressionTests
     [InlineData(ApplicationRoles.MedicalWorker, false, true, null, "Нет действующего сотрудника")]
     [InlineData(ApplicationRoles.MedicalWorker, false, false, false, "Нет действующего сотрудника")]
     [InlineData(ApplicationRoles.MedicalWorker, true, false, null, "Временно заблокирован")]
-    public void Account_status_reflects_lockout_and_the_linked_workers_availability(
+    public void GetAccountStatus_LockoutAndWorkerAvailability_ShouldReflectEffectiveAccess(
         string role, bool isLockedOut, bool hasWorkerLink, bool? workerDeleted, string expected)
     {
         var workerId = Guid.NewGuid();

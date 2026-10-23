@@ -25,7 +25,7 @@ public sealed class DirectoryConcurrencyTests(HospitalApiFactory factory) : ICla
     [InlineData("worker", true, true)]
     [InlineData("patient", true, true)]
     [InlineData("diagnosis", true, true)]
-    public async Task A_stale_update_or_delete_conflicts_without_overwriting_the_winner(
+    public async Task UpdateOrDelete_StaleVersion_ShouldConflictAndPreserveWinningChange(
         string kind, bool delete, bool saveSynchronously)
     {
         var id = Guid.NewGuid();
@@ -76,7 +76,7 @@ public sealed class DirectoryConcurrencyTests(HospitalApiFactory factory) : ICla
     [InlineData("unique", true)]
     [InlineData("check", true)]
     [InlineData("foreign-key", true)]
-    public async Task Database_constraint_failures_are_reported_as_business_conflicts(
+    public async Task Save_DatabaseConstraintViolation_ShouldReturnBusinessConflict(
         string constraint, bool saveSynchronously)
     {
         await using var scope = factory.Services.CreateAsyncScope();

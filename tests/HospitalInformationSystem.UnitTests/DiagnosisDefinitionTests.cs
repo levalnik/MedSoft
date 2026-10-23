@@ -19,14 +19,14 @@ public sealed class DiagnosisDefinitionTests
     [InlineData("A00.00", null)]
     [InlineData("A00.00", "АБ")]
     [InlineData("A00.00", "1234567890123456789012345")]
-    public void Invalid_code_or_name_is_rejected(string? code, string? name)
+    public void Create_InvalidCodeOrName_ShouldRejectInput(string? code, string? name)
     {
         var act = () => DiagnosisDefinitionFactory.Create(code!, name!, Now);
         act.Should().Throw<DomainValidationException>();
     }
 
     [Fact]
-    public void Update_normalizes_text_and_preserves_identity_and_creation_time()
+    public void Update_ValidFields_ShouldNormalizeTextAndPreserveIdentityAndCreationTime()
     {
         var diagnosis = DiagnosisDefinitionFactory.Create(" A00.00 ", " Холера ", Now);
         var id = diagnosis.Id;
@@ -40,7 +40,7 @@ public sealed class DiagnosisDefinitionTests
     }
 
     [Fact]
-    public void Failed_update_does_not_change_code_or_timestamp()
+    public void Update_InvalidFields_ShouldPreserveCodeAndTimestamp()
     {
         var diagnosis = DiagnosisDefinitionFactory.Create("A00.00", "Холера", Now);
         var act = () => DiagnosisDefinitionService.Update(diagnosis, "B01.00", " ", Now.AddHours(1));

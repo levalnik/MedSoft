@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Application.Common;
@@ -18,7 +19,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 public sealed class IdentityBootstrapperConcurrencyTests
 {
     [Fact]
-    public async Task Administrator_guards_reject_orphan_markers_and_deleting_the_reserved_role()
+    public async Task SaveAdministrator_OrphanMarkerOrReservedRoleDeletion_ShouldRejectMutation()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await postgres.StartAsync();
@@ -45,7 +46,7 @@ public sealed class IdentityBootstrapperConcurrencyTests
             var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
             (await db.Users.AnyAsync()).Should().BeFalse();
             await scope.ServiceProvider.GetRequiredService<IdentityBootstrapper>()
-                .InitializeAsync("only.admin", "Integration.Guard-Only.6249!");
+                .InitializeAsync("only.admin", "Integration.Guard-Only.6249!", CancellationToken.None);
         }
 
         await using (var scope = provider.CreateAsyncScope())
@@ -70,7 +71,7 @@ public sealed class IdentityBootstrapperConcurrencyTests
     }
 
     [Fact]
-    public async Task Concurrent_direct_role_assignments_cannot_bypass_the_single_administrator_database_guard()
+    public async Task AssignRole_ConcurrentAdministratorAssignments_ShouldEnforceSingleAdministrator()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await postgres.StartAsync();
@@ -130,7 +131,7 @@ public sealed class IdentityBootstrapperConcurrencyTests
     }
 
     [Fact]
-    public async Task Bootstrap_is_atomic_and_two_instances_can_initialize_the_same_empty_database()
+    public async Task Bootstrap_ConcurrentEmptyDatabaseInitialization_ShouldCompleteAtomically()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await postgres.StartAsync();
@@ -168,7 +169,7 @@ public sealed class IdentityBootstrapperConcurrencyTests
         {
             await using var scope = provider.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<IdentityBootstrapper>()
-                .InitializeAsync(userName, userName is null ? null : "Integration.Bootstrap-Only.6249!");
+                .InitializeAsync(userName, userName is null ? null : "Integration.Bootstrap-Only.6249!", CancellationToken.None);
         }
     }
 }

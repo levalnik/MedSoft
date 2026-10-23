@@ -7,7 +7,7 @@ namespace HospitalInformationSystem.Application.Diagnoses.Import;
 
 public static class DiagnosisCsvParser
 {
-    public static IReadOnlyList<DiagnosisCsvRow> Parse(string csv, CancellationToken cancellationToken = default)
+    public static IReadOnlyList<DiagnosisCsvRow> Parse(string csv, CancellationToken cancellationToken)
     {
         var physicalLines = csv.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         using var reader = new StringReader(csv.TrimStart('\uFEFF'));

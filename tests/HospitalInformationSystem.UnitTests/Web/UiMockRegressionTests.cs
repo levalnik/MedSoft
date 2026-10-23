@@ -1,8 +1,9 @@
+using System.Threading;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.Auth;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Web.ApiClients;
 using HospitalInformationSystem.Web.Authentication;
@@ -14,7 +15,7 @@ namespace HospitalInformationSystem.UnitTests.Web;
 public sealed class UiMockRegressionTests
 {
     [Fact]
-    public async Task Legacy_account_creation_rejects_a_second_administrator_without_changing_the_list()
+    public async Task CreateAccount_SecondAdministrator_ShouldRejectWithoutChangingList()
     {
         using var fixture = new Fixture(UiMockPersona.Administrator);
         var before = (await fixture.Http.GetFromJsonAsync<AccountDto[]>("api/accounts"))!;
@@ -30,7 +31,7 @@ public sealed class UiMockRegressionTests
     }
 
     [Fact]
-    public async Task Medical_mutations_return_the_same_status_and_json_contracts_as_the_real_api()
+    public async Task MutateMedicalRecord_ValidRequests_ShouldMatchRealApiStatusAndJson()
     {
         using var fixture = new Fixture(UiMockPersona.Doctor);
         var recordPath = $"api/medical-records/{UiMockState.MedicalRecordId}";
@@ -63,7 +64,7 @@ public sealed class UiMockRegressionTests
     [InlineData("2026-10-23T12:34:56")]
     [InlineData("2026-10-23")]
     [InlineData("2026-10-23T12:34:56+99:00")]
-    public async Task Historical_requests_reject_dates_that_the_real_api_cannot_accept(string value)
+    public async Task GetSnapshot_InvalidDates_ShouldRejectLikeRealApi(string value)
     {
         using var fixture = new Fixture(UiMockPersona.Doctor);
         using var response = await fixture.Http.GetAsync(
@@ -72,7 +73,7 @@ public sealed class UiMockRegressionTests
     }
 
     [Fact]
-    public async Task Historical_requests_resolve_equivalent_explicit_offsets_to_the_same_state()
+    public async Task GetSnapshot_EquivalentExplicitOffsets_ShouldReturnSameState()
     {
         using var fixture = new Fixture(UiMockPersona.Doctor);
         var records = new MedicalRecordsApiClient(fixture.Http);
@@ -88,7 +89,7 @@ public sealed class UiMockRegressionTests
     [InlineData("pageSize=10&PAGESIZE=20")]
     [InlineData("from=2026-10-23T12%3A34%3A56")]
     [InlineData("from=not-a-date")]
-    public async Task Malformed_audit_queries_return_an_http_error_instead_of_throwing_from_the_transport(string query)
+    public async Task ListAudit_MalformedQuery_ShouldReturnHttpError(string query)
     {
         using var fixture = new Fixture(UiMockPersona.Administrator);
         using var response = await fixture.Http.GetAsync($"api/audit?{query}");
@@ -96,7 +97,7 @@ public sealed class UiMockRegressionTests
     }
 
     [Fact]
-    public async Task Repeated_setup_headers_are_rejected_without_breaking_the_following_valid_request()
+    public async Task CompleteSetup_RepeatedHeaders_ShouldRejectAndAllowFollowingValidRequest()
     {
         using var fixture = new Fixture(UiMockPersona.Anonymous);
         fixture.State.SetupRequired = true;
@@ -111,7 +112,7 @@ public sealed class UiMockRegressionTests
 
         var challenge = await new AuthenticationGateway(fixture.Http,
                 new SessionApiClient(fixture.Http, fixture.Session, fixture.Tokens), fixture.Session)
-            .BeginSetupAsync(new BeginSetupRequest(password, password), UiMockState.SetupToken);
+            .BeginSetupAsync(new BeginSetupRequest(password, password), UiMockState.SetupToken, CancellationToken.None);
         challenge.ChallengeId.Should().NotBeEmpty();
     }
 

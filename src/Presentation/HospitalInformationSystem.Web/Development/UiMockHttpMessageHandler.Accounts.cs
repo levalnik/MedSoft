@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using HospitalInformationSystem.Contracts.Auth;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 
 namespace HospitalInformationSystem.Web.Development;
 
@@ -99,7 +99,7 @@ public sealed partial class UiMockHttpMessageHandler
         if (from is { } start) events = events.Where(x => x.EventTime >= start);
         if (to is { } end) events = events.Where(x => x.EventTime <= end);
         var skip = (long)(page - 1) * pageSize;
-        UiMockState.MockAuditEvent[] slice = skip > int.MaxValue ? [] : events.OrderByDescending(x => x.EventTime)
+        MockAuditEvent[] slice = skip > int.MaxValue ? [] : events.OrderByDescending(x => x.EventTime)
             .ThenByDescending(x => x.EventId).Skip((int)skip).Take(pageSize + 1).ToArray();
         var result = slice.Take(pageSize).Select(x => new AuditEventDto(x.EventId, x.EventTime,
             Enum.Parse<AuditEventType>(x.EventType), new AuditActorDto(
@@ -113,26 +113,26 @@ public sealed partial class UiMockHttpMessageHandler
         return Json(new PagedResult<AuditEventDto>(result, page, pageSize, slice.Length > pageSize));
     }
 
-    private UiMockState.MockAccount NewAccount(string userName, string role, Guid? workerId, string password)
+    private MockAccount NewAccount(string userName, string role, Guid? workerId, string password)
     {
         var now = DateTimeOffset.UtcNow;
-        var account = new UiMockState.MockAccount(Guid.NewGuid(), userName.Trim(), role, workerId, true, false, now, now);
+        var account = new MockAccount(Guid.NewGuid(), userName.Trim(), role, workerId, true, false, now, now);
         state.Accounts[account.Id] = account;
         state.Passwords[account.Id] = password;
         state.AddAudit("AccountCreated", "Создан демонстрационный аккаунт.", account.Id);
         return account;
     }
 
-    private Lab2AccountDto AccountDto(UiMockState.MockAccount account)
+    private AccountDetailsDto AccountDto(MockAccount account)
     {
         var worker = account.MedicalWorkerId is { } id ? state.Workers.GetValueOrDefault(id) : null;
-        return new Lab2AccountDto(account.Id, account.UserName, account.Role, account.MedicalWorkerId,
+        return new AccountDetailsDto(account.Id, account.UserName, account.Role, account.MedicalWorkerId,
             worker is null ? null : $"{worker.LastName} {worker.FirstName}",
             account.MedicalWorkerId is { } workerId ? UiMockState.ToRole(state.WorkerRoles[workerId]) : null,
             account.IsActive, account.IsLockedOut, account.CreatedAt, account.UpdatedAt);
     }
 
-    private object AccountWire(UiMockState.MockAccount account)
+    private object AccountWire(MockAccount account)
     {
         var dto = AccountDto(account);
         return new

@@ -13,7 +13,7 @@ public sealed class PatientTests
     private static readonly DateTimeOffset Now = new(2026, 10, 4, 12, 0, 0, TimeSpan.FromHours(3));
 
     [Fact]
-    public void Creation_normalizes_optional_text_and_preserves_birth_date()
+    public void Create_OptionalText_ShouldNormalizeTextAndPreserveBirthDate()
     {
         var patient = PatientFactory.Create(" Елена ", " Соколова ", "  ", new DateOnly(1985, 3, 12),
             AdministrativeSex.Female, " Аллергия ", Now);
@@ -32,7 +32,7 @@ public sealed class PatientTests
     [InlineData("")]
     [InlineData(" ")]
     [InlineData("12345678901234567890123456789012345678901234567890123456789012345")]
-    public void Invalid_name_is_rejected(string? name)
+    public void Create_InvalidName_ShouldRejectInput(string? name)
     {
         var act = () => PatientFactory.Create(name!, "Соколова", null, new DateOnly(1985, 3, 12),
             AdministrativeSex.Female, null, Now);
@@ -40,7 +40,7 @@ public sealed class PatientTests
     }
 
     [Fact]
-    public void Invalid_update_does_not_partially_change_patient()
+    public void Update_InvalidFields_ShouldPreservePatient()
     {
         var patient = PatientFactory.Create("Елена", "Соколова", null, new DateOnly(1985, 3, 12),
             AdministrativeSex.Female, null, Now);
@@ -54,7 +54,7 @@ public sealed class PatientTests
     }
 
     [Fact]
-    public void Unknown_enum_number_is_rejected()
+    public void Create_UnknownSexValue_ShouldRejectInput()
     {
         var act = () => PatientFactory.Create("Елена", "Соколова", null, new DateOnly(1985, 3, 12),
             (AdministrativeSex)123, null, Now);

@@ -9,7 +9,7 @@ using HospitalInformationSystem.Application.MedicalWorkers.Commands.DeleteMedica
 using HospitalInformationSystem.Application.MedicalWorkers.Commands.UpdateMedicalWorker;
 using HospitalInformationSystem.Domain.MedicalWorkers;
 using HospitalInformationSystem.Domain.MedicalWorkers.Factories;
-using ContractRole = HospitalInformationSystem.Contracts.Lab2.MedicalWorkerRole;
+using ContractRole = HospitalInformationSystem.Contracts.Security.MedicalWorkerRole;
 using Moq;
 using Xunit;
 
@@ -18,7 +18,7 @@ namespace HospitalInformationSystem.UnitTests;
 public sealed class MedicalWorkerUseCaseTests
 {
     [Fact]
-    public async Task Creation_uses_injected_clock_and_saves_the_new_worker()
+    public async Task Handle_ValidCommand_ShouldUseInjectedClockAndSaveWorker()
     {
         var now = new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
         var clock = new Mock<TimeProvider>();
@@ -40,7 +40,7 @@ public sealed class MedicalWorkerUseCaseTests
     }
 
     [Fact]
-    public async Task Deleting_unknown_worker_does_not_save_any_changes()
+    public async Task Handle_UnknownWorker_ShouldNotSaveChanges()
     {
         var repository = new Mock<IMedicalWorkerRepository>();
         var unitOfWork = new Mock<IUnitOfWork>();
@@ -54,7 +54,7 @@ public sealed class MedicalWorkerUseCaseTests
     [InlineData(null)]
     [InlineData(" ")]
     [InlineData("1234567890123456789012345")]
-    public async Task Command_validation_catches_invalid_input_before_handler(string? name)
+    public async Task ValidateAsync_InvalidInput_ShouldRejectBeforeHandler(string? name)
     {
         var validator = new CreateMedicalWorkerCommandValidator();
         var result = await validator.ValidateAsync(new CreateMedicalWorkerCommand(name!, "Иванов", "Врач"));
@@ -67,7 +67,7 @@ public sealed class MedicalWorkerUseCaseTests
     [InlineData(ContractRole.LaboratoryTechnician, MedicalWorkerRole.LaboratoryTechnician)]
     [InlineData(ContractRole.Nurse, MedicalWorkerRole.Nurse)]
     [InlineData(ContractRole.Other, MedicalWorkerRole.Other)]
-    public async Task Creation_maps_medical_roles_by_name_in_both_directions(ContractRole role,
+    public async Task Handle_ExplicitRole_ShouldMapRoleInBothDirections(ContractRole role,
         MedicalWorkerRole domainRole)
     {
         var repository = new Mock<IMedicalWorkerRepository>();
@@ -85,7 +85,7 @@ public sealed class MedicalWorkerUseCaseTests
     [InlineData(null, MedicalWorkerRole.Doctor, ContractRole.Doctor)]
     [InlineData(ContractRole.Nurse, MedicalWorkerRole.Nurse, ContractRole.Nurse)]
     [InlineData(ContractRole.Other, MedicalWorkerRole.Other, ContractRole.Other)]
-    public async Task Update_changes_role_only_when_it_is_provided(ContractRole? requestedRole,
+    public async Task Handle_OptionalRole_ShouldChangeRoleOnlyWhenProvided(ContractRole? requestedRole,
         MedicalWorkerRole expectedDomainRole, ContractRole expectedDtoRole)
     {
         var worker = MedicalWorkerFactory.Create("А", "Б", "Врач", DateTimeOffset.UtcNow, MedicalWorkerRole.Doctor);
@@ -104,7 +104,7 @@ public sealed class MedicalWorkerUseCaseTests
     [Theory]
     [InlineData(null)]
     [InlineData(ContractRole.Doctor)]
-    public async Task Command_validation_accepts_single_letter_names_and_optional_role(ContractRole? role)
+    public async Task ValidateAsync_SingleLetterNamesAndOptionalRole_ShouldAcceptInput(ContractRole? role)
     {
         var create = await new CreateMedicalWorkerCommandValidator()
             .ValidateAsync(new CreateMedicalWorkerCommand(" А ", "Б", "Врач", role));
@@ -115,7 +115,7 @@ public sealed class MedicalWorkerUseCaseTests
     }
 
     [Fact]
-    public async Task Command_validation_rejects_unknown_roles_and_short_positions()
+    public async Task ValidateAsync_UnknownRoleAndShortPosition_ShouldRejectInput()
     {
         var create = await new CreateMedicalWorkerCommandValidator()
             .ValidateAsync(new CreateMedicalWorkerCommand("А", "Б", "Аб", (ContractRole)99));
