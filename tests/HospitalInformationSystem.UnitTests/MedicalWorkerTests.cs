@@ -22,6 +22,7 @@ public sealed class MedicalWorkerTests
         worker.LastName.Should().Be("Иванов");
         worker.Position.Should().Be("Врач-терапевт");
         worker.IsDeleted.Should().BeFalse();
+        worker.Role.Should().Be(MedicalWorkerRole.Other);
         worker.CreatedAtUtc.Should().Be(Now);
         worker.CreatedAtUtc.Offset.Should().Be(TimeSpan.Zero);
         worker.UpdatedAtUtc.Should().Be(Now);
@@ -31,8 +32,6 @@ public sealed class MedicalWorkerTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData("Аб")]
-    [InlineData("  Аб  ")]
     [InlineData("1234567890123456789012345")]
     public void Invalid_worker_fields_are_rejected(string? value)
     {
@@ -52,6 +51,47 @@ public sealed class MedicalWorkerTests
         var text = new string('а', length);
         var worker = MedicalWorkerFactory.Create(text, text, text, Now);
         worker.FirstName.Length.Should().Be(length);
+    }
+
+    [Theory]
+    [InlineData("А", "Б")]
+    [InlineData(" Аб ", " Вг ")]
+    public void Short_names_are_accepted_but_short_positions_are_rejected(string firstName, string lastName)
+    {
+        var worker = MedicalWorkerFactory.Create(firstName, lastName, "Врач", Now);
+        worker.FirstName.Should().Be(firstName.Trim());
+        worker.LastName.Should().Be(lastName.Trim());
+        var create = () => MedicalWorkerFactory.Create(firstName, lastName, "Аб", Now);
+        create.Should().Throw<DomainValidationException>();
+    }
+
+    [Theory]
+    [InlineData(MedicalWorkerRole.Doctor)]
+    [InlineData(MedicalWorkerRole.Nurse)]
+    [InlineData(MedicalWorkerRole.LaboratoryTechnician)]
+    [InlineData(MedicalWorkerRole.Other)]
+    public void Factory_and_service_preserve_the_explicit_role(MedicalWorkerRole role)
+    {
+        var worker = MedicalWorkerFactory.Create("А", "Б", "Врач", Now, role);
+        worker.Role.Should().Be(role);
+        MedicalWorkerService.Update(worker, "В", "Г", "Хирург", Now.AddHours(1));
+        worker.Role.Should().Be(role);
+        MedicalWorkerService.Update(worker, "В", "Г", "Хирург", Now.AddHours(2), MedicalWorkerRole.Other);
+        worker.Role.Should().Be(MedicalWorkerRole.Other);
+    }
+
+    [Fact]
+    public void Invalid_role_does_not_partially_change_entity()
+    {
+        var worker = MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now, MedicalWorkerRole.Doctor);
+        var update = () => MedicalWorkerService.Update(worker, "Мария", "Петрова", "Сестра", Now.AddDays(1),
+            (MedicalWorkerRole)99);
+        update.Should().Throw<DomainValidationException>();
+        worker.FirstName.Should().Be("Алексей");
+        worker.LastName.Should().Be("Иванов");
+        worker.Position.Should().Be("Врач");
+        worker.Role.Should().Be(MedicalWorkerRole.Doctor);
+        worker.UpdatedAtUtc.Should().Be(Now);
     }
 
     [Fact]

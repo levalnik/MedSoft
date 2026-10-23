@@ -47,7 +47,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
         createdWorker.EnsureSuccessStatusCode();
         var worker = (await createdWorker.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
         const string password = "Integration.Portal-Only.6249!";
-        var name = "portal." + Guid.NewGuid().ToString("N");
+        var name = "portal." + Guid.NewGuid().ToString("N")[..9];
         using var createdAccount = await administrator.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest(name, password, ApplicationRoles.MedicalWorker, worker.Id));
         createdAccount.EnsureSuccessStatusCode();

@@ -1,3 +1,5 @@
+using HospitalInformationSystem.Domain.MedicalWorkers;
+
 namespace HospitalInformationSystem.Infrastructure.Persistence.Models;
 
 public sealed class MedicalWorkerDbo
@@ -6,6 +8,7 @@ public sealed class MedicalWorkerDbo
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Position { get; set; } = string.Empty;
+    public MedicalWorkerRole Role { get; set; } = MedicalWorkerRole.Other;
     public bool IsDeleted { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }

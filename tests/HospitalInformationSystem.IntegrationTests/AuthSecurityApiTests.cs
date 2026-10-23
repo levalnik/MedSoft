@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.Auth;
+using HospitalInformationSystem.Contracts.Lab2;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Contracts.Patients;
@@ -169,12 +170,6 @@ public sealed class AuthSecurityApiTests(SecureHospitalApiFactory factory) : ICl
             {
                 var binding = await db.UserRoles.SingleAsync(item => item.UserId == doctor.Id);
                 db.UserRoles.Remove(binding);
-                db.UserRoles.Add(new IdentityUserRole<Guid>
-                {
-                    UserId = doctor.Id,
-                    RoleId = await db.Roles.Where(role => role.Name == ApplicationRoles.Administrator)
-                        .Select(role => role.Id).SingleAsync()
-                });
             }
             else
             {
@@ -316,7 +311,7 @@ public sealed class AuthSecurityApiTests(SecureHospitalApiFactory factory) : ICl
             BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = true
         });
         await RefreshCsrfAsync(client);
-        var credentials = new LoginRequest("missing." + Guid.NewGuid().ToString("N"), "Invalid.Password.123!");
+        var credentials = new LoginRequest("missing." + Guid.NewGuid().ToString("N")[..8], "Invalid.Password.123!");
 
         (await client.PostAsJsonAsync("/api/auth/login", credentials)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await client.PostAsJsonAsync("/api/auth/login", credentials)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -388,7 +383,7 @@ public sealed class AuthSecurityApiTests(SecureHospitalApiFactory factory) : ICl
     {
         var worker = await CreateWorkerAsync(administrator);
         var response = await administrator.PostAsJsonAsync("/api/accounts", new CreateAccountRequest(
-            "doctor." + Guid.NewGuid().ToString("N"), DoctorPassword, ApplicationRoles.MedicalWorker, worker.Id));
+            "doctor." + Guid.NewGuid().ToString("N")[..9], DoctorPassword, ApplicationRoles.MedicalWorker, worker.Id));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AccountDto>())!;
     }
@@ -396,7 +391,7 @@ public sealed class AuthSecurityApiTests(SecureHospitalApiFactory factory) : ICl
     private static async Task<MedicalWorkerDto> CreateWorkerAsync(HttpClient administrator)
     {
         var response = await administrator.PostAsJsonAsync("/api/medical-workers",
-            new SaveMedicalWorkerRequest("Алексей", "Проверочный", "Врач"));
+            new SaveMedicalWorkerRequest("Алексей", "Проверочный", "Врач", MedicalWorkerRole.Doctor));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
     }

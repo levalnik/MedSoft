@@ -1,4 +1,5 @@
 using HospitalInformationSystem.Application.Abstractions;
+using HospitalInformationSystem.Contracts.Auth;
 using HospitalInformationSystem.Infrastructure.Contexts;
 using HospitalInformationSystem.Infrastructure.Initializers;
 using HospitalInformationSystem.Infrastructure.Identity;
@@ -16,6 +17,7 @@ public static class DependencyInjection
         services.AddDbContext<HospitalDbContext>(options => options.UseNpgsql(connectionString));
         services.AddIdentityCore<HospitalUser>(options =>
             {
+                options.User.AllowedUserNameCharacters = AccountUserNameRules.AllowedCharacters;
                 options.Password.RequiredLength = 12;
                 options.Password.RequireDigit = true;
                 options.Password.RequireLowercase = true;
@@ -28,6 +30,7 @@ public static class DependencyInjection
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<HospitalDbContext>()
             .AddSignInManager()
+            .AddUserValidator<AccountUserNameValidator>()
             .AddPasswordValidator<PasswordLengthValidator>();
         services.Configure<PasswordHasherOptions>(options => options.IterationCount = 220_000);
         services.AddScoped<AccountService>();

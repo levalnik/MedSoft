@@ -23,6 +23,9 @@ public sealed partial class UiMockHttpMessageHandler
                 return BadRequest("Выберите действующего медработника.");
             if (input.Role == ApplicationRoles.Administrator && input.MedicalWorkerId is not null)
                 return BadRequest("Администратор не привязывается к медработнику.");
+            if (input.Role == ApplicationRoles.Administrator &&
+                state.Accounts.Values.Any(account => account.Role == ApplicationRoles.Administrator))
+                return Error(HttpStatusCode.Conflict, "В системе уже существует администратор.");
             if (DuplicateAccount(input.UserName, input.MedicalWorkerId)) return AccountConflict();
             var account = NewAccount(input.UserName, input.Role, input.MedicalWorkerId, input.Password);
             return Json(AccountWire(account), HttpStatusCode.Created);
@@ -135,7 +138,8 @@ public sealed partial class UiMockHttpMessageHandler
         return new
         {
             dto.Id, dto.UserName, Role = dto.AccountRole, dto.AccountRole, dto.MedicalWorkerId,
-            dto.MedicalWorkerName, dto.MedicalWorkerRole, dto.IsActive, dto.IsLockedOut, dto.CreatedAt, dto.UpdatedAt
+            dto.MedicalWorkerName, dto.MedicalWorkerRole, dto.IsActive, dto.IsLockedOut, dto.CreatedAt, dto.UpdatedAt,
+            CreatedAtUtc = dto.CreatedAt, UpdatedAtUtc = dto.UpdatedAt
         };
     }
 
@@ -145,6 +149,5 @@ public sealed partial class UiMockHttpMessageHandler
     private static HttpResponseMessage AccountConflict() => Error(HttpStatusCode.Conflict,
         "Логин уже используется или для медработника уже создан аккаунт.");
     private static string GeneratePassword() => $"Dd1{Guid.NewGuid():N}"[..12];
-    private static bool ValidUserName(string? value) => value?.Trim() is { Length: >= 3 and <= 16 } text
-        && text.All(x => char.IsAsciiLetterOrDigit(x) || x is '.' or '_' or '@' or '+' or '-');
+    private static bool ValidUserName(string? value) => AccountUserNameRules.IsValid(value?.Trim());
 }

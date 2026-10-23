@@ -19,7 +19,7 @@
       <div class="form-grid">
         <div>
           <label for="account-name">Логин</label>
-          <InputText id="account-name" class="form-control" @bind-Value="_form.UserName" maxlength="64"
+          <InputText id="account-name" class="form-control" @bind-Value="_form.UserName" minlength="3" maxlength="16"
                      autocomplete="off"/>
           <ValidationMessage For="() => _form.UserName"/>
         </div>
@@ -33,7 +33,6 @@
           <label for="account-role">Роль</label>
           <InputSelect id="account-role" class="form-control" @bind-Value="_form.Role">
             <option value="@ApplicationRoles.MedicalWorker">Медработник</option>
-            <option value="@ApplicationRoles.Administrator">Администратор</option>
           </InputSelect>
           <ValidationMessage For="() => _form.Role"/>
         </div>
@@ -53,7 +52,7 @@
         }
       </div>
       <p id="password-help" class="field-hint">Пароль: 12–128 символов, строчные и прописные латинские буквы,
-        цифра и специальный символ. Логин: 3–64 символа, латинские буквы, цифры и знаки <code>._-@@+</code>.</p>
+        цифра и специальный символ. Логин: 3–16 символов, латинские буквы, цифры и знаки <code>._-@@+</code>.</p>
       <ErrorAlert Message="@_formError"/>
       @if (_notice is not null)
       {
@@ -242,7 +241,8 @@
   private sealed class AccountForm : IValidatableObject
   {
     [Required(ErrorMessage = "Укажите логин.")]
-    [StringLength(64, MinimumLength = 3, ErrorMessage = "Логин: от 3 до 64 символов.")]
+    [StringLength(AccountUserNameRules.MaxLength, MinimumLength = AccountUserNameRules.MinLength,
+      ErrorMessage = "Логин: от 3 до 16 символов.")]
     [RegularExpression("[A-Za-z0-9._@+-]+", ErrorMessage = "Логин содержит недопустимые символы.")]
     public string UserName { get; set; } = "";
 

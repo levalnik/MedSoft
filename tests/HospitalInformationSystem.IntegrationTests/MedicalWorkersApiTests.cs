@@ -21,25 +21,63 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
 {
     private readonly HttpClient _client = factory.CreateBusinessClient();
 
+    [Theory]
+    [InlineData(MedicalWorkerRole.Doctor)]
+    [InlineData(MedicalWorkerRole.LaboratoryTechnician)]
+    [InlineData(MedicalWorkerRole.Nurse)]
+    [InlineData(MedicalWorkerRole.Other)]
+    public async Task Medical_role_roundtrips_and_legacy_update_preserves_it(MedicalWorkerRole role)
+    {
+        using var created = await _client.PostAsJsonAsync("/api/medical-workers",
+            new SaveMedicalWorkerRequest(" А ", " Б ", "Врач", role));
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var worker = (await created.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
+        worker.FirstName.Should().Be("А");
+        worker.LastName.Should().Be("Б");
+        worker.Role.Should().Be(role);
+        (await _client.GetFromJsonAsync<MedicalWorkerDto>($"/api/medical-workers/{worker.Id}"))!
+            .Role.Should().Be(role);
+        (await _client.GetFromJsonAsync<MedicalWorkerDto[]>("/api/medical-workers"))!
+            .Should().Contain(x => x.Id == worker.Id && x.Role == role);
+
+        using var updated = await _client.PutAsJsonAsync($"/api/medical-workers/{worker.Id}",
+            new SaveMedicalWorkerRequest("В", "Г", "Хирург"));
+        updated.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await updated.Content.ReadFromJsonAsync<MedicalWorkerDto>())!.Role.Should().Be(role);
+        (await _client.GetFromJsonAsync<MedicalWorkerDto>($"/api/medical-workers/{worker.Id}"))!
+            .Role.Should().Be(role);
+
+        using var explicitOther = await _client.PutAsJsonAsync($"/api/medical-workers/{worker.Id}",
+            new SaveMedicalWorkerRequest("В", "Г", "Хирург", MedicalWorkerRole.Other));
+        explicitOther.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await explicitOther.Content.ReadFromJsonAsync<MedicalWorkerDto>())!.Role.Should().Be(MedicalWorkerRole.Other);
+        (await _client.GetFromJsonAsync<MedicalWorkerDto>($"/api/medical-workers/{worker.Id}"))!
+            .Role.Should().Be(MedicalWorkerRole.Other);
+    }
+
     [Fact]
-    public async Task Unsupported_medical_role_does_not_silently_create_or_update_a_worker()
+    public async Task Legacy_create_defaults_to_other_without_guessing_from_position()
+    {
+        using var created = await _client.PostAsJsonAsync("/api/medical-workers",
+            new SaveMedicalWorkerRequest("А", "Б", "Врач"));
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await created.Content.ReadFromJsonAsync<MedicalWorkerDto>())!.Role.Should().Be(MedicalWorkerRole.Other);
+    }
+
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("Doctor")]
+    [InlineData("1")]
+    public async Task Unknown_medical_role_returns_400_without_writes(string role)
     {
         var before = await _client.GetFromJsonAsync<MedicalWorkerDto[]>("/api/medical-workers?includeDeleted=true");
-        using var rejectedCreate = await _client.PostAsJsonAsync("/api/medical-workers",
-            new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач", MedicalWorkerRole.Doctor));
-        rejectedCreate.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
+        using var response = await _client.PostAsJsonAsync("/api/medical-workers", new
+        {
+            FirstName = "А", LastName = "Б", Position = "Врач", Role = role
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await _client.GetFromJsonAsync<MedicalWorkerDto[]>("/api/medical-workers?includeDeleted=true"))!
             .Should().BeEquivalentTo(before);
-
-        using var created = await _client.PostAsJsonAsync("/api/medical-workers",
-            new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач"));
-        created.EnsureSuccessStatusCode();
-        var worker = (await created.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
-        using var rejectedUpdate = await _client.PutAsJsonAsync($"/api/medical-workers/{worker.Id}",
-            new SaveMedicalWorkerRequest("Мария", "Петрова", "Сестра", MedicalWorkerRole.Nurse));
-        rejectedUpdate.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
-        (await _client.GetFromJsonAsync<MedicalWorkerDto>($"/api/medical-workers/{worker.Id}"))!
-            .Should().BeEquivalentTo(worker);
     }
 
     [Fact]
@@ -78,7 +116,7 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
     [Theory]
     [InlineData(null)]
     [InlineData(" ")]
-    [InlineData("Аб")]
+    [InlineData("")]
     [InlineData("1234567890123456789012345")]
     public async Task Invalid_input_returns_validation_problem_and_does_not_insert(string? name)
     {
@@ -116,7 +154,7 @@ public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassF
         var now = DateTimeOffset.UtcNow;
         Func<Task> act = async () => await db.Database.ExecuteSqlInterpolatedAsync($"""
              INSERT INTO medical_workers (id, first_name, last_name, position, is_deleted, created_at_utc, updated_at_utc)
-             VALUES ({id}, 'А', 'Орлов', 'Врач', false, {now}, {now})
+             VALUES ({id}, '', 'Орлов', 'Врач', false, {now}, {now})
              """);
         (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should()
             .Be(PostgresErrorCodes.CheckViolation);

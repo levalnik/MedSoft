@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using HospitalInformationSystem.Contracts.Auth;
 using HospitalInformationSystem.Contracts.Lab2;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Web.ApiClients;
@@ -12,6 +13,22 @@ namespace HospitalInformationSystem.UnitTests.Web;
 
 public sealed class UiMockRegressionTests
 {
+    [Fact]
+    public async Task Legacy_account_creation_rejects_a_second_administrator_without_changing_the_list()
+    {
+        using var fixture = new Fixture(UiMockPersona.Administrator);
+        var before = (await fixture.Http.GetFromJsonAsync<AccountDto[]>("api/accounts"))!;
+
+        using var response = await fixture.Http.PostAsJsonAsync("api/accounts",
+            new CreateAccountRequest("second.admin", "Integration.Password.6249!", ApplicationRoles.Administrator, null));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var after = (await fixture.Http.GetFromJsonAsync<AccountDto[]>("api/accounts"))!;
+        after.Should().BeEquivalentTo(before);
+        after.Count(account => account.Role == ApplicationRoles.Administrator).Should().Be(1);
+        after.Should().OnlyContain(account => account.CreatedAtUtc != default && account.UpdatedAtUtc != default);
+    }
+
     [Fact]
     public async Task Medical_mutations_return_the_same_status_and_json_contracts_as_the_real_api()
     {

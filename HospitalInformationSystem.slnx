@@ -8,6 +8,7 @@
     <Project Path="src/Infrastructure/HospitalInformationSystem.Infrastructure/HospitalInformationSystem.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/Presentation/">
+    <Project Path="src/Presentation/HospitalInformationSystem.Maintenance/HospitalInformationSystem.Maintenance.csproj" />
     <Project Path="src/Presentation/HospitalInformationSystem.Api/HospitalInformationSystem.Api.csproj" />
     <Project Path="src/Presentation/HospitalInformationSystem.Web/HospitalInformationSystem.Web.csproj" />
   </Folder>

@@ -253,10 +253,10 @@ else
 
   private sealed class WorkerForm
   {
-    [Required(ErrorMessage = "Укажите имя."), StringLength(24, MinimumLength = 3, ErrorMessage = "Имя: от 3 до 24 символов.")]
+    [Required(ErrorMessage = "Укажите имя."), StringLength(24, MinimumLength = 1, ErrorMessage = "Имя: от 1 до 24 символов.")]
     public string FirstName { get; set; } = "";
 
-    [Required(ErrorMessage = "Укажите фамилию."), StringLength(24, MinimumLength = 3, ErrorMessage = "Фамилия: от 3 до 24 символов.")]
+    [Required(ErrorMessage = "Укажите фамилию."), StringLength(24, MinimumLength = 1, ErrorMessage = "Фамилия: от 1 до 24 символов.")]
     public string LastName { get; set; } = "";
 
     [Required(ErrorMessage = "Укажите должность."), StringLength(24, MinimumLength = 3, ErrorMessage = "Должность: от 3 до 24 символов.")]

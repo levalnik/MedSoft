@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Infrastructure/HospitalInformationSystem.Infrastructure/HospitalInformationSystem.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

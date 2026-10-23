@@ -1,5 +1,6 @@
 using HospitalInformationSystem.Domain.Diagnoses.Factories;
 using HospitalInformationSystem.Domain.MedicalWorkers.Factories;
+using HospitalInformationSystem.Domain.MedicalWorkers;
 using HospitalInformationSystem.Domain.MedicalWorkers.Services;
 using HospitalInformationSystem.Infrastructure.Contexts;
 using HospitalInformationSystem.Infrastructure.Persistence.Mappings;
@@ -37,12 +38,12 @@ public sealed class DatabaseInitializer(HospitalDbContext db, TimeProvider timeP
             return;
         }
 
-        var deleted = MedicalWorkerFactory.Create("Анна", "Кузнецова", "Медицинская сестра", now);
+        var deleted = MedicalWorkerFactory.Create("Анна", "Кузнецова", "Медицинская сестра", now, MedicalWorkerRole.Nurse);
         MedicalWorkerService.MarkAsDeleted(deleted, now);
         db.MedicalWorkers.AddRange(
-            MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач-терапевт", now).ToDbo(),
-            MedicalWorkerFactory.Create("Мария", "Петрова", "Врач-хирург", now).ToDbo(),
-            MedicalWorkerFactory.Create("Дмитрий", "Смирнов", "Врач-анестезиолог", now).ToDbo(),
+            MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач-терапевт", now, MedicalWorkerRole.Doctor).ToDbo(),
+            MedicalWorkerFactory.Create("Мария", "Петрова", "Врач-хирург", now, MedicalWorkerRole.Doctor).ToDbo(),
+            MedicalWorkerFactory.Create("Дмитрий", "Смирнов", "Врач-анестезиолог", now, MedicalWorkerRole.Doctor).ToDbo(),
             deleted.ToDbo());
         await db.SaveChangesAsync(cancellationToken);
     }
