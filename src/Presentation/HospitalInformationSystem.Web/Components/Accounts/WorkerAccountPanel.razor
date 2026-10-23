@@ -1,0 +1,212 @@
+@using HospitalInformationSystem.Contracts.Lab2
+@implements IDisposable
+@inject HospitalInformationSystem.Web.Gateways.IAccountManagementGateway Accounts
+
+<section class="surface account-panel" aria-labelledby="account-panel-title">
+  <div class="registry-heading">
+    <div><h2 id="account-panel-title">Учётная запись сотрудника</h2>
+      <p>Доступ сотрудника к системе. Пароль генерируется сервером.</p></div>
+  </div>
+
+  @if (_loading)
+  {
+    <div class="empty-state" role="status">Загрузка учётной записи…</div>
+  }
+  else if (_loadError is not null)
+  {
+    <ErrorAlert Message="@_loadError"/>
+    <button type="button" class="btn btn-outline-primary" @onclick="LoadAsync">Повторить</button>
+  }
+  else if (_account is { } account)
+  {
+    <dl class="account-facts">
+      <div><dt>Логин</dt><dd>@account.UserName</dd></div>
+      <div><dt>Создана</dt><dd>@account.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd></div>
+      <div><dt>Обновлена</dt><dd>@account.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd></div>
+    </dl>
+    <AccountOperations Account="account" WorkerDeleted="WorkerDeleted" OnChanged="OnAccountChanged"/>
+  }
+  else if (WorkerDeleted)
+  {
+    <div class="empty-state">
+      <p>Сотрудник помечен удалённым, поэтому создать учётную запись для него нельзя.</p>
+    </div>
+  }
+  else
+  {
+    <GeneratedPasswordCard Password="_createdPassword" Title="Учётная запись создана"
+                           OnDismiss="() => _createdPassword = null"/>
+    <EditForm Model="_form" OnValidSubmit="CreateAsync">
+      <DataAnnotationsValidator/>
+      <fieldset disabled="@_creating">
+        <div class="mr-field">
+          <label for="new-account-login">Логин</label>
+          <InputText id="new-account-login" class="form-control" @bind-Value="_form.UserName" maxlength="16"
+                     autocomplete="off" autocapitalize="none" spellcheck="false"/>
+          <ValidationMessage For="() => _form.UserName"/>
+          <p class="field-hint">Логин: 3–16 символов, латинские буквы, цифры и знаки <code>._@@+-</code>.
+            Роль и связь с сотрудником назначаются автоматически.</p>
+        </div>
+        <ErrorAlert Message="@_createError"/>
+        <button type="submit" class="btn btn-primary">@(_creating ? "Создание…" : "Создать учётную запись")</button>
+      </fieldset>
+    </EditForm>
+  }
+</section>
+
+@code {
+  [Parameter, EditorRequired] public Guid WorkerId { get; set; }
+  [Parameter] public bool WorkerDeleted { get; set; }
+  [Parameter] public EventCallback OnChanged { get; set; }
+
+  private readonly AccountForm _form = new();
+  private CancellationTokenSource? _cts;
+  private Guid _loadedWorkerId;
+  private Lab2AccountDto? _account;
+  private bool _loading;
+  private bool _creating;
+  private bool _disposed;
+  private int _loadVersion;
+  private string? _loadError;
+  private string? _createError;
+  private string? _createdPassword;
+
+  protected override async Task OnParametersSetAsync()
+  {
+    if (_loadedWorkerId == WorkerId && _cts is not null)
+    {
+      return;
+    }
+
+    _loadedWorkerId = WorkerId;
+    _createdPassword = null;
+    await LoadAsync();
+  }
+
+  private async Task LoadAsync()
+  {
+    _cts?.Cancel();
+    _cts?.Dispose();
+    _cts = new CancellationTokenSource();
+    var token = _cts.Token;
+    var version = ++_loadVersion;
+    _loading = true;
+    _loadError = null;
+    try
+    {
+      var accounts = await Accounts.ListAsync(token);
+      if (!IsCurrent(token) || version != _loadVersion)
+      {
+        return;
+      }
+
+      _account = accounts.FirstOrDefault(item => item.MedicalWorkerId == WorkerId);
+    }
+    catch (Exception exception) when (exception is OperationCanceledException && token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException exception)
+    {
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _loadError = exception.Message;
+      }
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+    {
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _loadError = "Не удалось загрузить учётную запись. Повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token) && version == _loadVersion)
+      {
+        _loading = false;
+      }
+    }
+  }
+
+  private async Task CreateAsync()
+  {
+    if (_creating || _disposed || _cts is null)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    _creating = true;
+    _createError = null;
+    try
+    {
+      var result = await Accounts.CreateForWorkerAsync(WorkerId,
+        new CreateWorkerAccountRequest(_form.UserName.Trim()), token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      _account = result.Account;
+      _createdPassword = result.GeneratedPassword;
+      _form.UserName = "";
+      await NotifyChangedAsync();
+    }
+    catch (Exception exception) when (exception is OperationCanceledException && token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException exception)
+    {
+      if (IsCurrent(token))
+      {
+        _createError = exception.Message;
+      }
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _createError = "Не удалось создать учётную запись. Обновите страницу и повторите попытку.";
+      }
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _creating = false;
+      }
+    }
+  }
+
+  private async Task OnAccountChanged(Lab2AccountDto account)
+  {
+    _account = account;
+    await NotifyChangedAsync();
+  }
+
+  private async Task NotifyChangedAsync()
+  {
+    if (OnChanged.HasDelegate)
+    {
+      await OnChanged.InvokeAsync();
+    }
+  }
+
+  private bool IsCurrent(CancellationToken token) => !_disposed && !token.IsCancellationRequested;
+
+  public void Dispose()
+  {
+    _disposed = true;
+    _createdPassword = null;
+    _cts?.Cancel();
+    _cts?.Dispose();
+  }
+
+  private sealed class AccountForm
+  {
+    [Required(ErrorMessage = "Укажите логин.")]
+    [StringLength(16, MinimumLength = 3, ErrorMessage = "Логин: от 3 до 16 символов.")]
+    [RegularExpression("[A-Za-z0-9._@+-]+", ErrorMessage = "Логин содержит недопустимые символы.")]
+    public string UserName { get; set; } = "";
+  }
+}

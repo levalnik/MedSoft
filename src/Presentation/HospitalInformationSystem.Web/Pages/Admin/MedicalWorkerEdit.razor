@@ -1,6 +1,7 @@
 @page "/admin/medical-workers/new"
 @page "/admin/medical-workers/{Id:guid}"
 @using HospitalInformationSystem.Contracts.Lab2
+@using HospitalInformationSystem.Web.Components.Accounts
 @attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @implements IDisposable
 @inject MedicalWorkersApiClient Api
@@ -121,6 +122,10 @@ else if (_model is not null)
       }
     </section>
   </div>
+  @if (Id is { } workerId)
+  {
+    <WorkerAccountPanel WorkerId="workerId" WorkerDeleted="@(_worker?.IsDeleted ?? false)"/>
+  }
 }
 else
 {
