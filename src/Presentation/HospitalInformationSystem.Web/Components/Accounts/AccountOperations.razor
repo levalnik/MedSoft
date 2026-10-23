@@ -1,0 +1,225 @@
+@using HospitalInformationSystem.Contracts.Lab2
+@implements IDisposable
+@inject HospitalInformationSystem.Web.Gateways.IAccountManagementGateway Accounts
+
+<div class="account-operations">
+  <div class="account-status-line">
+    <span class="status @(Account.IsActive ? "status-active" : "status-deleted")">
+      <span class="status-dot"></span>@(Account.IsActive ? "Активен" : "Деактивирован")
+    </span>
+    @if (Account.IsLockedOut)
+    {
+      <span class="status status-warning"><span class="status-dot"></span>Временно заблокирован</span>
+    }
+  </div>
+
+  <ErrorAlert Message="@_error"/>
+  @if (_notice is not null)
+  {
+    <p role="status" class="field-hint">@_notice</p>
+  }
+
+  <GeneratedPasswordCard Password="_generatedPassword" Title="Новый пароль сотрудника"
+                         OnDismiss="() => _generatedPassword = null"/>
+
+  @if (_confirm is null)
+  {
+    <div class="button-row">
+      <button type="button" class="btn btn-outline-primary" disabled="@_busy"
+              @onclick="() => Ask(ConfirmKind.Reset)">
+        Сгенерировать новый пароль
+      </button>
+      @if (Account.IsActive)
+      {
+        <button type="button" class="btn btn-soft-danger" disabled="@_busy"
+                @onclick="() => Ask(ConfirmKind.Deactivate)">
+          Деактивировать
+        </button>
+      }
+      else if (WorkerDeleted)
+      {
+        <p class="field-hint">Сотрудник удалён, поэтому активировать учётную запись нельзя.</p>
+      }
+      else
+      {
+        <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="ActivateAsync">
+          Активировать
+        </button>
+      }
+    </div>
+  }
+  else
+  {
+    <div class="confirm-panel" role="alertdialog" aria-label="Подтверждение операции">
+      <p>
+        @(_confirm == ConfirmKind.Reset
+          ? "Сгенерировать новый пароль? Текущий пароль перестанет действовать, активные сессии будут отозваны."
+          : "Деактивировать учётную запись? Сотрудник потеряет доступ, активные сессии будут отозваны.")
+      </p>
+      <div class="button-row">
+        <button type="button" class="btn btn-danger" disabled="@_busy" @onclick="ConfirmAsync">
+          @(_busy ? "Выполнение…" : "Подтвердить")
+        </button>
+        <button type="button" class="btn btn-light" disabled="@_busy" @onclick="() => _confirm = null">Отмена</button>
+      </div>
+    </div>
+  }
+</div>
+
+@code {
+  [Parameter, EditorRequired] public Lab2AccountDto Account { get; set; } = default!;
+  [Parameter] public bool WorkerDeleted { get; set; }
+  [Parameter] public EventCallback<Lab2AccountDto> OnChanged { get; set; }
+
+  private readonly CancellationTokenSource _cts = new();
+  private ConfirmKind? _confirm;
+  private bool _busy;
+  private bool _disposed;
+  private string? _error;
+  private string? _notice;
+  private string? _generatedPassword;
+
+  private enum ConfirmKind
+  {
+    Reset,
+    Deactivate
+  }
+
+  private void Ask(ConfirmKind kind)
+  {
+    if (_busy)
+    {
+      return;
+    }
+
+    _confirm = kind;
+    _error = null;
+  }
+
+  private Task ConfirmAsync() => _confirm switch
+  {
+    ConfirmKind.Reset => ResetAsync(),
+    ConfirmKind.Deactivate => SetActiveAsync(false),
+    _ => Task.CompletedTask
+  };
+
+  private async Task ResetAsync()
+  {
+    if (_busy || _disposed)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    _busy = true;
+    _error = null;
+    _notice = null;
+    try
+    {
+      var result = await Accounts.ResetPasswordAsync(Account.Id, token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      _generatedPassword = result.GeneratedPassword;
+      _notice = $"Пароль обновлён. Отозвано refresh-токенов: {result.RevokedRefreshTokenCount}.";
+      _confirm = null;
+    }
+    catch (Exception exception) when (HandleFailure(exception, token))
+    {
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _busy = false;
+      }
+    }
+  }
+
+  private Task ActivateAsync() => SetActiveAsync(true);
+
+  private async Task SetActiveAsync(bool isActive)
+  {
+    if (_busy || _disposed)
+    {
+      return;
+    }
+
+    var token = _cts.Token;
+    _busy = true;
+    _error = null;
+    _notice = null;
+    try
+    {
+      var result = await Accounts.SetActiveAsync(Account.Id, isActive, token);
+      if (!IsCurrent(token))
+      {
+        return;
+      }
+
+      Account = result.Account;
+      _notice = isActive
+        ? "Учётная запись активирована."
+        : $"Учётная запись деактивирована. Отозвано refresh-токенов: {result.RevokedRefreshTokenCount}.";
+      _confirm = null;
+      if (OnChanged.HasDelegate)
+      {
+        await OnChanged.InvokeAsync(result.Account);
+      }
+    }
+    catch (Exception exception) when (HandleFailure(exception, token))
+    {
+    }
+    finally
+    {
+      if (IsCurrent(token))
+      {
+        _busy = false;
+      }
+    }
+  }
+
+  private bool HandleFailure(Exception exception, CancellationToken token)
+  {
+    if (exception is OperationCanceledException && token.IsCancellationRequested)
+    {
+      return true;
+    }
+
+    if (exception is ApiException api)
+    {
+      if (IsCurrent(token))
+      {
+        _error = api.Message;
+        _confirm = null;
+      }
+
+      return true;
+    }
+
+    if (exception is HttpRequestException or TaskCanceledException)
+    {
+      if (IsCurrent(token))
+      {
+        _error = "Не удалось выполнить операцию. Обновите данные и повторите попытку.";
+        _confirm = null;
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+  private bool IsCurrent(CancellationToken token) => !_disposed && !token.IsCancellationRequested;
+
+  public void Dispose()
+  {
+    _disposed = true;
+    _generatedPassword = null;
+    _cts.Cancel();
+    _cts.Dispose();
+  }
+}

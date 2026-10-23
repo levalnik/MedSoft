@@ -1,0 +1,36 @@
+@using HospitalInformationSystem.Contracts.Lab2
+
+<div class="table-responsive">
+  <table class="table mr-table audit-table">
+    <thead>
+    <tr>
+      <th scope="col">Время</th>
+      <th scope="col">Тип события</th>
+      <th scope="col">Инициатор</th>
+      <th scope="col">Сообщение</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var item in Items)
+    {
+      <tr @key="item.EventId">
+        <td data-label="Время">@item.EventTime.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</td>
+        <td data-label="Тип события">@AuditLabels.EventType(item.EventType)</td>
+        <td data-label="Инициатор">
+          <span class="actor-kind actor-@item.Actor.Kind.ToString().ToLowerInvariant()">@AuditLabels.ActorKind(item.Actor)</span>
+          <span class="actor-title">@AuditLabels.ActorTitle(item.Actor)</span>
+          @if (AuditLabels.ActorDetail(item.Actor) is { } detail)
+          {
+            <small class="actor-detail">@detail</small>
+          }
+        </td>
+        <td data-label="Сообщение">@item.Message</td>
+      </tr>
+    }
+    </tbody>
+  </table>
+</div>
+
+@code {
+  [Parameter, EditorRequired] public IReadOnlyList<AuditEventDto> Items { get; set; } = [];
+}

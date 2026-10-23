@@ -2,18 +2,26 @@
 @page "/medical/patients/{Id:guid}"
 @attribute [Authorize(Roles = ApplicationRoles.MedicalWorker)]
 @using HospitalInformationSystem.Contracts.Patients
+@using HospitalInformationSystem.Contracts.Lab2
 @implements IDisposable
 @inject PatientsApiClient Api
 @inject NavigationManager Navigation
+@inject SessionState Session
 
 <PageTitle>@(Id is null ? "Новый пациент" : "Карточка пациента") · Учебная HIS</PageTitle>
 <a class="back-link" href="/medical/patients">
   <Icon Name="arrow"/>
   К списку пациентов</a>
 <div class="page-heading">
-  <div><h1>@(Id is null ? "Новый пациент" : "Редактирование пациента")</h1>
+  <div><h1>@(Id is null ? "Новый пациент" : (CanManage ? "Редактирование пациента" : "Карточка пациента"))</h1>
     <p>Регистрационные данные пациента лечебного учреждения.</p></div>
+  <span class="status status-admin role-badge"><span class="status-dot"></span>Ваша роль: @MedicalRoleLabels.Describe(Role)</span>
 </div>
+@if (!CanManage)
+{
+  <div class="alert alert-warning" role="status">Ваша роль даёт только просмотр регистрационных данных.
+    Изменять и удалять пациента может врач или медсестра.</div>
+}
 <ErrorAlert Message="@_error"/>
 @if (_loading)
 {
@@ -34,10 +42,13 @@ else if (_model is not null)
         <span class="status @(_patient?.HasMedicalRecord == true ? "status-active" : "status-deleted")">
           <span class="status-dot"></span>@(_patient?.HasMedicalRecord == true ? "ЭМК есть" : "Нет ЭМК")
         </span>
-        <a class="btn btn-outline-primary" href="/medical/patients/@Id/medical-record">
-          <Icon Name="record"/>
-          @(_patient?.HasMedicalRecord == true ? "Открыть ЭМК" : "Создать ЭМК")
-        </a>
+        @if (_patient?.HasMedicalRecord == true || CanManage)
+        {
+          <a class="btn btn-outline-primary" href="/medical/patients/@Id/medical-record">
+            <Icon Name="record"/>
+            @(_patient?.HasMedicalRecord == true ? "Открыть ЭМК" : "Создать ЭМК")
+          </a>
+        }
       }
       <div class="profile-note">
         <Icon Name="record"/>
@@ -46,7 +57,7 @@ else if (_model is not null)
     <section class="surface edit-surface" aria-label="Редактирование данных">
       <EditForm Model="_model" OnValidSubmit="SaveAsync">
         <DataAnnotationsValidator/>
-        <fieldset disabled="@_busy">
+        <fieldset disabled="@(_busy || !CanManage)">
           <div class="form-section">
             <div class="section-title"><span class="step-number">01</span>
               <div><h2>Личные данные</h2>
@@ -97,13 +108,16 @@ else if (_model is not null)
             <p class="field-hint">ФИО — до 64 символов, комментарий — до 32 символов.</p>
           </div>
           <div class="form-actions">
-            <a class="btn btn-light" href="/medical/patients">Отмена</a>
-            <button type="submit" class="btn btn-primary">
-              <Icon Name="check"/> @(_busy ? "Сохранение…" : "Сохранить")</button>
+            <a class="btn btn-light" href="/medical/patients">@(CanManage ? "Отмена" : "Назад")</a>
+            @if (CanManage)
+            {
+              <button type="submit" class="btn btn-primary">
+                <Icon Name="check"/> @(_busy ? "Сохранение…" : "Сохранить")</button>
+            }
           </div>
         </fieldset>
       </EditForm>
-      @if (Id is not null)
+      @if (Id is not null && CanManage)
       {
         <div class="delete-section">
           <div><strong>Пациент выбыл?</strong>
@@ -139,6 +153,9 @@ else
 
 @code {
   [Parameter] public Guid? Id { get; set; }
+
+  private MedicalWorkerRole? Role => Session.Current?.MedicalWorkerRole;
+  private bool CanManage => Role is MedicalWorkerRole.Doctor or MedicalWorkerRole.Nurse;
 
   private PatientForm? _model;
   private PatientDto? _patient;
@@ -227,7 +244,7 @@ else
 
   private Task SaveAsync() => ExecuteAsync(async token =>
   {
-    if (_model is null)
+    if (_model is null || !CanManage)
     {
       return;
     }
@@ -247,7 +264,7 @@ else
 
   private Task DeleteAsync() => ExecuteAsync(async token =>
   {
-    if (Id is { } id)
+    if (Id is { } id && CanManage)
     {
       await Api.DeleteAsync(id, token);
     }

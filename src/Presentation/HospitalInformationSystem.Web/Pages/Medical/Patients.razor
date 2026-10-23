@@ -1,8 +1,10 @@
 @page "/medical/patients"
 @attribute [Authorize(Roles = ApplicationRoles.MedicalWorker)]
 @using HospitalInformationSystem.Contracts.Patients
+@using HospitalInformationSystem.Contracts.Lab2
 @implements IDisposable
 @inject PatientsApiClient Api
+@inject SessionState Session
 
 <PageTitle>Пациенты · Учебная HIS</PageTitle>
 <div class="eyebrow"><span class="eyebrow-line"></span> РАБОТА С ПАЦИЕНТАМИ</div>
@@ -11,9 +13,15 @@
     <h1>Пациенты</h1>
     <p>Реестр пациентов и электронные медицинские карты.</p>
   </div>
-  <a class="btn btn-primary" href="/medical/patients/new">
-    <Icon Name="plus"/>
-    Добавить пациента</a>
+  <div class="page-heading-actions">
+    <span class="status status-admin role-badge"><span class="status-dot"></span>Ваша роль: @MedicalRoleLabels.Describe(Role)</span>
+    @if (CanManage)
+    {
+      <a class="btn btn-primary" href="/medical/patients/new">
+        <Icon Name="plus"/>
+        Добавить пациента</a>
+    }
+  </div>
 </div>
 
 @if (_patients is not null)
@@ -111,15 +119,21 @@
               }
             </td>
             <td class="actions-cell">
-              <a class="row-edit" href="/medical/patients/@patient.Id/medical-record"
-                 aria-label="@(patient.HasMedicalRecord ? "Открыть ЭМК" : "Создать ЭМК"): @patient.LastName @patient.FirstName">
-                @(patient.HasMedicalRecord ? "Открыть ЭМК" : "Создать ЭМК")
-                <Icon Name="forward"/>
-              </a>
-              <button class="icon-button danger" title="Удалить пациента" disabled="@_deleting"
-                      aria-label="Удалить: @patient.LastName @patient.FirstName" @onclick="() => AskDelete(patient)">
-                <Icon Name="delete"/>
-              </button>
+              @if (patient.HasMedicalRecord || CanManage)
+              {
+                <a class="row-edit" href="/medical/patients/@patient.Id/medical-record"
+                   aria-label="@(patient.HasMedicalRecord ? "Открыть ЭМК" : "Создать ЭМК"): @patient.LastName @patient.FirstName">
+                  @(patient.HasMedicalRecord ? "Открыть ЭМК" : "Создать ЭМК")
+                  <Icon Name="forward"/>
+                </a>
+              }
+              @if (CanManage)
+              {
+                <button class="icon-button danger" title="Удалить пациента" disabled="@_deleting"
+                        aria-label="Удалить: @patient.LastName @patient.FirstName" @onclick="() => AskDelete(patient)">
+                  <Icon Name="delete"/>
+                </button>
+              }
             </td>
           </tr>
         }
@@ -148,6 +162,9 @@
   private CancellationTokenSource? _cts;
   private int _loadVersion;
   private bool _disposed;
+
+  private MedicalWorkerRole? Role => Session.Current?.MedicalWorkerRole;
+  private bool CanManage => Role is MedicalWorkerRole.Doctor or MedicalWorkerRole.Nurse;
 
   private IEnumerable<PatientDto> VisiblePatients => (_patients ?? [])
     .Where(x => $"{x.LastName} {x.FirstName} {x.MiddleName}".Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));

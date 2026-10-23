@@ -19,7 +19,7 @@
       <div class="mr-field">
         <label for="user-name">Логин</label>
         <InputText id="user-name" class="form-control" @bind-Value="_form.UserName" autocomplete="username"
-                   autocapitalize="none" spellcheck="false" maxlength="64"/>
+                   autocapitalize="none" spellcheck="false" maxlength="16"/>
         <ValidationMessage For="() => _form.UserName"/>
       </div>
       <div class="mr-field">
@@ -28,6 +28,16 @@
                    autocomplete="current-password" maxlength="128"/>
         <ValidationMessage For="() => _form.Password"/>
       </div>
+      @if (IsAdministrator)
+      {
+        <div class="mr-field">
+          <label for="totp">Код подтверждения</label>
+          <InputText id="totp" class="form-control" @bind-Value="_form.TotpCode" inputmode="numeric"
+                     autocomplete="one-time-code" maxlength="6" placeholder="123456"/>
+          <ValidationMessage For="() => _form.TotpCode"/>
+          <p class="field-hint">Для администратора: шесть цифр из приложения-аутентификатора.</p>
+        </div>
+      }
       <ErrorAlert Message="@_error"/>
       <button type="submit" class="btn btn-primary">@(_busy ? "Вход…" : "Войти")</button>
     </fieldset>
@@ -49,28 +59,52 @@
   private string? _error;
   private bool IsAdministrator => Portal == LoginPortal.Administrator;
 
+  protected override async Task OnInitializedAsync()
+  {
+    try
+    {
+      var status = await Authentication.GetSetupStatusAsync(_cancellation.Token);
+      if (status.SetupRequired && !_cancellation.IsCancellationRequested)
+      {
+        Navigation.NavigateTo("/setup", replace: true);
+      }
+    }
+    catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException
+      or OperationCanceledException)
+    {
+    }
+  }
+
   private async Task LoginAsync()
   {
     if (_busy)
+    {
       return;
+    }
 
     _busy = true;
     _error = null;
     try
     {
-      await Authentication.LoginAsync(new LoginRequest(_form.UserName.Trim(), _form.Password, Portal: Portal),
+      var totp = IsAdministrator && !string.IsNullOrWhiteSpace(_form.TotpCode) ? _form.TotpCode.Trim() : null;
+      await Authentication.LoginAsync(new LoginRequest(_form.UserName.Trim(), _form.Password, totp, Portal),
         _cancellation.Token);
       if (!_cancellation.IsCancellationRequested)
+      {
         Navigation.NavigateTo(LoginNavigation.GetReturnPath(Portal, ReturnUrl), replace: true);
+      }
     }
     catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
     {
     }
     catch (ApiException exception)
     {
-      _error = exception.StatusCode == System.Net.HttpStatusCode.Unauthorized
-        ? "Не удалось войти. Проверьте учётные данные и выбранный раздел входа."
-        : exception.Message;
+      _error = exception.StatusCode switch
+      {
+        System.Net.HttpStatusCode.Unauthorized => "Не удалось войти. Проверьте учётные данные и выбранный раздел входа.",
+        System.Net.HttpStatusCode.TooManyRequests => "Слишком много попыток входа. Повторите позже.",
+        _ => exception.Message
+      };
     }
     catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
     {
@@ -79,6 +113,7 @@
     finally
     {
       _form.Password = "";
+      _form.TotpCode = "";
       _busy = false;
     }
   }
@@ -86,6 +121,7 @@
   public void Dispose()
   {
     _form.Password = "";
+    _form.TotpCode = "";
     _cancellation.Cancel();
     _cancellation.Dispose();
   }
@@ -93,11 +129,14 @@
   private sealed class Credentials
   {
     [Required(ErrorMessage = "Укажите логин.")]
-    [StringLength(64, ErrorMessage = "Логин: не более 64 символов.")]
+    [StringLength(16, ErrorMessage = "Логин: не более 16 символов.")]
     public string UserName { get; set; } = "";
 
     [Required(ErrorMessage = "Укажите пароль.")]
     [StringLength(128, ErrorMessage = "Пароль: не более 128 символов.")]
     public string Password { get; set; } = "";
+
+    [RegularExpression("[0-9]{6}", ErrorMessage = "Код подтверждения: шесть цифр.")]
+    public string TotpCode { get; set; } = "";
   }
 }
