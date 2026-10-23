@@ -355,3 +355,21 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--green); fl
   .toolbar-note { padding: 0 18px; }
   .activity-filter { width: 100%; margin-left: 0; margin-top: 6px; }
 }
+
+/* Раздел «Аудит» (N4) */
+.audit-indicator { display: flex; align-items: center; }
+.status-idle { color: #5b6f61; background: #eef1ea; }
+.audit-filters { flex-wrap: wrap; gap: 14px; }
+.audit-archive { margin: 0 28px 16px; }
+.audit-pager { justify-content: center; gap: 18px; }
+.audit-pager .btn { min-height: 38px; padding: 8px 16px; }
+.audit-table td[data-label="Инициатор"] { line-height: 1.5; }
+.actor-kind { display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 12px; margin-right: 6px; }
+.actor-user { color: #3d5a8a; background: #e9eff8; }
+.actor-anonymous { color: #8a6d1f; background: #faf1d6; }
+.actor-system { color: #5b6f61; background: #eef1ea; }
+.actor-title { font-weight: 550; }
+.actor-detail { display: block; color: #83917a; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .audit-archive { margin: 0 18px 16px; }
+}

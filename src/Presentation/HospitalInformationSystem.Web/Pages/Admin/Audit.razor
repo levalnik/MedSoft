@@ -1,0 +1,251 @@
+@page "/admin/audit"
+@using HospitalInformationSystem.Contracts.Lab2
+@using HospitalInformationSystem.Web.Components.Audit
+@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
+@implements IDisposable
+@inject HospitalInformationSystem.Web.Gateways.IAuditGateway Gateway
+
+<PageTitle>Аудит · Учебная HIS</PageTitle>
+<div class="eyebrow"><span class="eyebrow-line"></span> БЕЗОПАСНОСТЬ</div>
+<div class="page-heading">
+  <div><h1>Аудит</h1>
+    <p>Неизменяемый журнал событий безопасности и администрирования.</p></div>
+  <div class="audit-indicator" aria-live="polite">
+    @if (_page == 1)
+    {
+      <span class="status @(_refreshing ? "status-active" : "status-idle")">
+        <span class="status-dot"></span>@(_refreshing ? "Обновление…" : "Автообновление 1 с")
+      </span>
+    }
+    else
+    {
+      <span class="status status-warning"><span class="status-dot"></span>Просмотр архива</span>
+    }
+  </div>
+</div>
+
+<section class="surface" aria-label="Журнал аудита">
+  <div class="registry-heading">
+    <div><h2>События</h2>
+      <p>Новые события сверху. Время показано в местном поясе.</p></div>
+    <button class="btn btn-outline-primary" disabled="@_inFlight" @onclick="ManualRefreshAsync">Обновить</button>
+  </div>
+  <div class="table-toolbar audit-filters">
+    <label class="checkbox-label" for="audit-type">Тип:
+      <select id="audit-type" class="form-control activity-filter" value="@_eventTypeValue" @onchange="OnEventTypeChanged">
+        <option value="">Все типы</option>
+        @foreach (var type in Enum.GetValues<AuditEventType>())
+        {
+          <option value="@type">@AuditLabels.EventType(type)</option>
+        }
+      </select>
+    </label>
+    <label class="checkbox-label" for="audit-period">Период:
+      <select id="audit-period" class="form-control activity-filter" value="@_period" @onchange="OnPeriodChanged">
+        <option value="@PeriodFilter.All">Всё время</option>
+        <option value="@PeriodFilter.Hour">За последний час</option>
+        <option value="@PeriodFilter.Day">За последние сутки</option>
+      </select>
+    </label>
+  </div>
+
+  @if (_page > 1)
+  {
+    <div class="confirm-panel audit-archive">
+      <p>Вы просматриваете архивные события. Автообновление приостановлено.</p>
+      <button class="btn btn-primary" @onclick="BackToCurrentAsync">К актуальным событиям</button>
+    </div>
+  }
+
+  <ErrorAlert Message="@_error"/>
+
+  @if (_loading)
+  {
+    <div class="empty-state" role="status">Загрузка журнала…</div>
+  }
+  else if (_items.Count == 0)
+  {
+    <div class="empty-state">
+      @(_error is null ? "События по заданным условиям не найдены." : "Не удалось загрузить журнал.")
+      @if (_error is not null)
+      {
+        <div><button class="btn btn-outline-primary" @onclick="ManualRefreshAsync">Повторить</button></div>
+      }
+    </div>
+  }
+  else
+  {
+    <AuditTable Items="_items"/>
+    <div class="table-footer audit-pager">
+      <button class="btn btn-light" disabled="@(_page == 1 || _inFlight)" @onclick="GoNewerAsync">Новее</button>
+      <span>Страница @_page</span>
+      <button class="btn btn-light" disabled="@(!_hasMore || _inFlight)" @onclick="GoOlderAsync">Старее</button>
+    </div>
+  }
+</section>
+
+@code {
+  private const int PageSize = 50;
+
+  private IReadOnlyList<AuditEventDto> _items = [];
+  private CancellationTokenSource? _cts;
+  private PeriodicTimer? _timer;
+  private bool _loading = true;
+  private bool _refreshing;
+  private bool _inFlight;
+  private bool _hasMore;
+  private int _page = 1;
+  private string? _error;
+  private AuditEventType? _eventType;
+  private PeriodFilter _period = PeriodFilter.All;
+
+  private string _eventTypeValue = "";
+
+  private enum PeriodFilter
+  {
+    All,
+    Hour,
+    Day
+  }
+
+  protected override async Task OnInitializedAsync()
+  {
+    _cts = new CancellationTokenSource();
+    await RefreshAsync(initial: true);
+    _ = PollLoopAsync();
+  }
+
+  private async Task PollLoopAsync()
+  {
+    _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+    try
+    {
+      while (await _timer.WaitForNextTickAsync(_cts!.Token))
+      {
+        if (_page == 1 && !_inFlight)
+        {
+          await RefreshAsync(initial: false);
+          await InvokeAsync(StateHasChanged);
+        }
+      }
+    }
+    catch (OperationCanceledException)
+    {
+    }
+  }
+
+  private async Task RefreshAsync(bool initial)
+  {
+    if (_cts is null || _inFlight)
+    {
+      return;
+    }
+
+    _inFlight = true;
+    if (initial)
+    {
+      _loading = true;
+    }
+    else
+    {
+      _refreshing = true;
+    }
+
+    var token = _cts.Token;
+    try
+    {
+      var query = new AuditQuery(_page, PageSize, _eventType, PeriodStart(), null);
+      var result = await Gateway.ListAsync(query, token);
+      if (token.IsCancellationRequested)
+      {
+        return;
+      }
+
+      _items = result.Items;
+      _hasMore = result.HasMore;
+      _error = null;
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (ApiException exception)
+    {
+      if (!token.IsCancellationRequested)
+      {
+        _error = exception.Message;
+      }
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+    {
+      if (!token.IsCancellationRequested)
+      {
+        _error = "Сервер недоступен. Журнал не обновлён.";
+      }
+    }
+    finally
+    {
+      _loading = false;
+      _refreshing = false;
+      _inFlight = false;
+    }
+  }
+
+  private DateTimeOffset? PeriodStart() => _period switch
+  {
+    PeriodFilter.Hour => DateTimeOffset.UtcNow.AddHours(-1),
+    PeriodFilter.Day => DateTimeOffset.UtcNow.AddDays(-1),
+    _ => null
+  };
+
+  private Task ManualRefreshAsync() => RefreshAsync(initial: false);
+
+  private async Task OnEventTypeChanged(ChangeEventArgs args)
+  {
+    _eventTypeValue = args.Value?.ToString() ?? "";
+    _eventType = Enum.TryParse<AuditEventType>(_eventTypeValue, out var parsed) ? parsed : null;
+    _page = 1;
+    await RefreshAsync(initial: true);
+  }
+
+  private async Task OnPeriodChanged(ChangeEventArgs args)
+  {
+    _period = Enum.TryParse<PeriodFilter>(args.Value?.ToString(), out var parsed) ? parsed : PeriodFilter.All;
+    _page = 1;
+    await RefreshAsync(initial: true);
+  }
+
+  private async Task GoOlderAsync()
+  {
+    if (!_hasMore || _inFlight)
+    {
+      return;
+    }
+
+    _page++;
+    await RefreshAsync(initial: true);
+  }
+
+  private async Task GoNewerAsync()
+  {
+    if (_page == 1 || _inFlight)
+    {
+      return;
+    }
+
+    _page--;
+    await RefreshAsync(initial: true);
+  }
+
+  private async Task BackToCurrentAsync()
+  {
+    _page = 1;
+    await RefreshAsync(initial: true);
+  }
+
+  public void Dispose()
+  {
+    _cts?.Cancel();
+    _timer?.Dispose();
+    _cts?.Dispose();
+  }
+}
