@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "eventId": "60000000-0000-4000-8000-000000000001",
+      "eventTime": "2026-10-22T10:00:15Z",
+      "eventType": "AccountChanged",
+      "actor": {
+        "kind": "user",
+        "userId": "50000000-0000-4000-8000-000000000001",
+        "displayName": "admin.demo",
+        "requestId": "ui-example-001",
+        "component": null
+      },
+      "message": "Демонстрационный аккаунт деактивирован.",
+      "metadata": {
+        "reason": "AccountDeactivated",
+        "revokedRefreshTokenCount": 2
+      }
+    },
+    {
+      "eventId": "60000000-0000-4000-8000-000000000002",
+      "eventTime": "2026-10-22T10:00:14Z",
+      "eventType": "LoginFailed",
+      "actor": {
+        "kind": "anonymous",
+        "userId": null,
+        "displayName": "Неавторизованный запрос",
+        "requestId": "ui-example-002",
+        "component": null
+      },
+      "message": "Неуспешный вход в демонстрационную систему.",
+      "metadata": {
+        "attemptedUserName": "unknown.demo"
+      }
+    }
+  ],
+  "page": 1,
+  "pageSize": 50,
+  "hasMore": false
+}

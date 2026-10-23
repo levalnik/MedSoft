@@ -5,6 +5,12 @@
       "launchBrowser": false,
       "applicationUrl": "http://localhost:5100",
       "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    },
+    "ui-mock": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5100",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "UiMock" }
     }
   }
 }

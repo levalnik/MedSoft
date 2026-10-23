@@ -1,0 +1,6 @@
+{
+  "challengeId": "70000000-0000-4000-8000-000000000001",
+  "secretKey": "JBSWY3DPEHPK3PXP",
+  "authenticatorUri": "otpauth://totp/UiMock:admin.demo?secret=JBSWY3DPEHPK3PXP&issuer=UiMock",
+  "expiresAt": "2026-10-22T10:05:00Z"
+}

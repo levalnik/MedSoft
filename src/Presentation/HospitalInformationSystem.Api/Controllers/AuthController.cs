@@ -34,7 +34,9 @@ public sealed class AuthController(
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.UserName) || request.UserName.Length > 128 ||
-            string.IsNullOrEmpty(request.Password) || request.Password.Length > 128)
+            string.IsNullOrEmpty(request.Password) || request.Password.Length > 128 ||
+            !string.IsNullOrEmpty(request.TotpCode) ||
+            request.Portal is { } portal && !Enum.IsDefined(portal))
             return InvalidCredentials();
 
         var user = await userManager.FindByNameAsync(request.UserName.Trim());
@@ -49,7 +51,7 @@ public sealed class AuthController(
             return InvalidCredentials();
 
         var session = await accounts.GetSessionAsync(user.Id, cancellationToken);
-        if (session is null)
+        if (session is null || !MatchesPortal(session.Role, request.Portal))
             return InvalidCredentials();
 
         await signInManager.SignInAsync(user, isPersistent: false);
@@ -79,4 +81,11 @@ public sealed class AuthController(
 
     private ObjectResult InvalidCredentials() => Problem(statusCode: StatusCodes.Status401Unauthorized,
         title: "Не удалось войти.", detail: "Проверьте имя пользователя и пароль или повторите попытку позднее.");
+
+    private static bool MatchesPortal(string role, LoginPortal? portal) => portal switch
+    {
+        LoginPortal.Administrator => role == ApplicationRoles.Administrator,
+        LoginPortal.MedicalWorker => role == ApplicationRoles.MedicalWorker,
+        _ => true
+    };
 }

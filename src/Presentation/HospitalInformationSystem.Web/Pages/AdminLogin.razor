@@ -1,0 +1,10 @@
+@page "/admin/login"
+@layout LoginLayout
+
+<PageTitle>Вход администратора · Учебная HIS</PageTitle>
+<HospitalInformationSystem.Web.Components.Authentication.LoginForm Portal="LoginPortal.Administrator"
+                                                                  ReturnUrl="@ReturnUrl"/>
+
+@code {
+  [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+}

@@ -1,0 +1,111 @@
+@using System.Net
+@using HospitalInformationSystem.Web.Configuration
+@using HospitalInformationSystem.Web.Development
+@implements IDisposable
+@inject UiMockOptions Options
+@inject IServiceProvider Services
+@inject NavigationManager Navigation
+
+@if (_state is not null)
+{
+  <aside class="ui-mock-panel" aria-label="Настройки демонстрационных данных">
+    <div class="ui-mock-heading">
+      <strong>Демонстрационные данные</strong>
+      <span>API и база данных не используются</span>
+    </div>
+    <details>
+      <summary>Сценарии для разработки интерфейса</summary>
+      <div class="ui-mock-fields">
+        <label>Пользователь
+          <select aria-label="Пользователь" value="@_state.Persona" @onchange="SwitchPersona">
+            <option value="@UiMockPersona.Anonymous">Без входа</option>
+            <option value="@UiMockPersona.Administrator">Администратор</option>
+            <option value="@UiMockPersona.Doctor">Врач</option>
+            <option value="@UiMockPersona.Nurse">Медсестра / медбрат</option>
+            <option value="@UiMockPersona.LaboratoryTechnician">Лаборант</option>
+            <option value="@UiMockPersona.Other">Другая медицинская роль</option>
+          </select>
+        </label>
+        <label>Следующий ответ
+          <select aria-label="Следующий ответ" value="@(_state.NextStatusCode is { } status ? ((int)status).ToString() : "")" @onchange="SetNextError">
+            <option value="">Обычный ответ</option>
+            <option value="400">400 · Ошибка данных</option>
+            <option value="401">401 · Вход истёк</option>
+            <option value="403">403 · Недостаточно прав</option>
+            <option value="409">409 · Конфликт</option>
+            <option value="429">429 · Слишком много запросов</option>
+            <option value="503">503 · Сервис недоступен</option>
+          </select>
+        </label>
+        <label>Задержка ответа, мс
+          <input aria-label="Задержка ответа, мс" type="number" min="0" max="5000" step="100" value="@_state.ResponseDelay.TotalMilliseconds"
+                 @onchange="SetDelay"/>
+        </label>
+        <label class="ui-mock-checkbox">
+          <input type="checkbox" checked="@_state.SetupRequired" @onchange="SetSetupRequired"/>
+          Первоначальная настройка не завершена
+        </label>
+        <button type="button" class="btn btn-light" @onclick="Reset">Сбросить демонстрационные данные</button>
+      </div>
+      <p class="ui-mock-credentials">Логины: <code>admin.demo</code>, <code>doctor.demo</code>, <code>nurse.demo</code>,
+        <code>lab.demo</code>, <code>other.demo</code>. Демонстрационный пароль: <code>@UiMockState.DemonstrationPassword</code>.
+        Код для mock-настройки: <code>@UiMockState.DemonstrationTotpCode</code>.</p>
+      <p class="ui-mock-credentials">Данные хранятся в памяти вкладки. После перезагрузки восстанавливаются примеры.</p>
+    </details>
+  </aside>
+}
+
+@code {
+  private UiMockState? _state;
+
+  protected override void OnInitialized()
+  {
+    if (!Options.Enabled) return;
+    _state = Services.GetRequiredService<UiMockState>();
+    _state.Changed += OnStateChanged;
+  }
+
+  private void SwitchPersona(ChangeEventArgs args)
+  {
+    if (_state is null || !Enum.TryParse<UiMockPersona>(args.Value?.ToString(), out var persona) ||
+        !Enum.IsDefined(persona)) return;
+    _state.SwitchPersona(persona);
+    Navigation.NavigateTo("/", replace: true);
+  }
+
+  private void SetNextError(ChangeEventArgs args)
+  {
+    if (_state is not null)
+      _state.NextStatusCode = int.TryParse(args.Value?.ToString(), out var code) ? (HttpStatusCode)code : null;
+  }
+
+  private void SetDelay(ChangeEventArgs args)
+  {
+    if (_state is not null && int.TryParse(args.Value?.ToString(), out var delay))
+      _state.ResponseDelay = TimeSpan.FromMilliseconds(Math.Clamp(delay, 0, 5000));
+  }
+
+  private void SetSetupRequired(ChangeEventArgs args)
+  {
+    if (_state is null) return;
+    _state.SetupRequired = args.Value is true;
+    if (_state.SetupRequired)
+    {
+      _state.SwitchPersona(UiMockPersona.Anonymous);
+      Navigation.NavigateTo("/admin/login", replace: true);
+    }
+  }
+
+  private void Reset()
+  {
+    _state?.Reset();
+    Navigation.NavigateTo("/login", replace: true);
+  }
+
+  private void OnStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+  public void Dispose()
+  {
+    if (_state is not null) _state.Changed -= OnStateChanged;
+  }
+}
