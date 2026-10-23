@@ -24,7 +24,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     private static readonly DateTimeOffset T0 = new(2026, 10, 4, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task Snapshots_replay_T0_to_T4_and_preserve_history_after_catalog_and_author_changes()
+    public async Task GetSnapshot_CatalogAndAuthorChanges_ShouldReplayEveryStateAndPreserveHistory()
     {
         factory.Clock.SetUtcNow(T0);
         var worker = await CreateWorker();
@@ -96,7 +96,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     [InlineData("malformed")]
     [InlineData("unknown")]
     [InlineData("deleted")]
-    public async Task Every_write_rejects_invalid_author_without_changing_state_or_history(string kind)
+    public async Task Write_InvalidAuthor_ShouldRejectWithoutChangingStateOrHistory(string kind)
     {
         var worker = await CreateWorker();
         var patient = await CreatePatient();
@@ -141,7 +141,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Missing_resources_and_children_belonging_to_other_record_return_404_without_mutations()
+    public async Task Write_MissingResourceOrWrongRecordChild_ShouldReturnNotFoundWithoutMutation()
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);
@@ -172,7 +172,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Invalid_replacement_does_not_cancel_original_and_cancelled_prescription_cannot_be_replaced()
+    public async Task ReplacePrescription_InvalidOrCancelledOriginal_ShouldPreserveOriginalAndRejectReplacement()
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);
@@ -196,7 +196,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Snapshot_requires_explicit_timezone_and_returns_404_before_record_creation()
+    public async Task GetSnapshot_MissingTimezoneOrTimeBeforeCreation_ShouldRejectInvalidTimeAndReturnNotFound()
     {
         factory.Clock.SetUtcNow(T0);
         var record = await CreateRecord(await CreatePatient(), await CreateWorker());
@@ -209,7 +209,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Concurrent_record_creation_has_one_winner_and_patient_cannot_be_deleted_afterwards()
+    public async Task CreateRecord_ConcurrentRequests_ShouldCommitOneAndPreventPatientDeletion()
     {
         var worker = await CreateWorker();
         var patient = await CreatePatient();
@@ -228,7 +228,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Concurrent_additions_keep_state_and_event_versions_consistent()
+    public async Task AddDiagnosis_ConcurrentRequests_ShouldKeepStateAndVersionsConsistent()
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);
@@ -251,7 +251,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Aggregate_read_avoids_collection_cross_product_and_keeps_one_database_snapshot()
+    public async Task GetRecord_ConcurrentMutation_ShouldUseOneDatabaseSnapshotWithoutCollectionCrossProduct()
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);
@@ -286,7 +286,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Commands_reading_same_version_cannot_both_commit()
+    public async Task Write_CommandsAtSameVersion_ShouldCommitOnlyOne()
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);
@@ -307,7 +307,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Concurrent_replacements_cancel_once_and_commit_only_one_successor()
+    public async Task ReplacePrescription_ConcurrentRequests_ShouldCancelOnceAndCommitOneSuccessor()
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);
@@ -327,7 +327,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Patient_deletion_racing_record_creation_never_leaves_orphan_or_returns_500()
+    public async Task DeletePatient_ConcurrentRecordCreation_ShouldAvoidOrphansAndServerErrors()
     {
         var worker = await CreateWorker();
         for (var attempt = 0; attempt < 4; attempt++)
@@ -361,7 +361,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Failed_history_insert_rolls_back_cancellation_replacement_and_version(bool simulateDeadlock)
+    public async Task ReplacePrescription_HistoryInsertFailure_ShouldRollBackAllChanges(bool simulateDeadlock)
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);
@@ -408,7 +408,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task PostgreSql_enforces_unique_versions_unique_patient_restrict_and_jsonb()
+    public async Task Save_InvalidRelationalState_ShouldEnforceVersionsPatientUniquenessAndReferences()
     {
         var worker = await CreateWorker();
         var patient = await CreatePatient();
@@ -449,7 +449,7 @@ public sealed class MedicalRecordsApiTests(MedicalRecordsApiFactory factory)
     }
 
     [Fact]
-    public async Task Deleting_catalog_diagnosis_keeps_active_record_diagnosis_snapshot_and_history()
+    public async Task DeleteCatalogDiagnosis_ReferencedDiagnosis_ShouldPreserveRecordSnapshotAndHistory()
     {
         var worker = await CreateWorker();
         var record = await CreateRecord(await CreatePatient(), worker);

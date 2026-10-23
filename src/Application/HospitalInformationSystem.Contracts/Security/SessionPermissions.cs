@@ -1,8 +1,8 @@
 using HospitalInformationSystem.Contracts.Auth;
 
-namespace HospitalInformationSystem.Contracts.Lab2;
+namespace HospitalInformationSystem.Contracts.Security;
 
-public static class Lab2SessionPermissions
+public static class SessionPermissions
 {
     public static bool CanManageAdministration(AuthenticationSessionDto? session) =>
         session?.AccountRole == ApplicationRoles.Administrator;

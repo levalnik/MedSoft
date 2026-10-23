@@ -31,11 +31,11 @@ public sealed class ApiClientTests
 
     [Theory]
     [MemberData(nameof(InvalidSuccessResponses))]
-    public async Task Invalid_success_response_becomes_a_displayable_error(string operation, string body)
+    public async Task Send_InvalidSuccessBody_ShouldReturnDisplayableError(string operation, string body)
     {
         using var http = CreateClient(HttpStatusCode.OK, body);
 
-        var action = () => RequestAsync(operation, http);
+        var action = () => RequestAsync(operation, http, CancellationToken.None);
 
         await action.Should().ThrowAsync<ApiException>().WithMessage("*некорректный ответ*");
     }
@@ -47,12 +47,12 @@ public sealed class ApiClientTests
     [InlineData("save")]
     [InlineData("import")]
     [InlineData("delete")]
-    public async Task Validation_problem_displays_unique_errors_and_tolerates_null_entries(string operation)
+    public async Task Send_ValidationProblem_ShouldDeduplicateErrorsAndIgnoreNullEntries(string operation)
     {
         using var http = CreateClient(HttpStatusCode.BadRequest,
             """{"title":"Ошибка","errors":{"Code":["Неверный код.","Неверный код."],"Name":null,"Other":[""]}}""");
 
-        var action = () => RequestAsync(operation, http);
+        var action = () => RequestAsync(operation, http, CancellationToken.None);
 
         await action.Should().ThrowAsync<ApiException>().WithMessage("Неверный код.");
     }
@@ -63,18 +63,18 @@ public sealed class ApiClientTests
     [InlineData("import", "{\"detail\":\"Конфликт кодов.\",\"title\":\"Ошибка\"}", "Конфликт кодов.")]
     [InlineData("save", "{\"title\":\"Ошибка сохранения.\"}", "Ошибка сохранения.")]
     [InlineData("delete", "{\"title\":\"\",\"detail\":\" \"}", "Ошибка сервера: 502.")]
-    public async Task Server_error_uses_problem_details_or_status_fallback(string operation, string body,
+    public async Task Send_ServerError_ShouldUseProblemDetailsOrStatusFallback(string operation, string body,
         string message)
     {
         using var http = CreateClient(HttpStatusCode.BadGateway, body);
 
-        var action = () => RequestAsync(operation, http);
+        var action = () => RequestAsync(operation, http, CancellationToken.None);
 
         await action.Should().ThrowAsync<ApiException>().WithMessage(message);
     }
 
     [Fact]
-    public async Task Valid_empty_catalog_is_distinct_from_an_invalid_response()
+    public async Task ListDiagnoses_ValidEmptyCatalog_ShouldReturnEmptyList()
     {
         using var http = CreateClient(HttpStatusCode.OK, "[]");
 
@@ -84,7 +84,7 @@ public sealed class ApiClientTests
     }
 
     [Fact]
-    public async Task Valid_worker_response_preserves_false_status()
+    public async Task GetWorker_ActiveWorker_ShouldPreserveFalseDeletionStatus()
     {
         var id = Guid.NewGuid();
         using var http = CreateClient(HttpStatusCode.OK,
@@ -96,7 +96,7 @@ public sealed class ApiClientTests
     }
 
     [Fact]
-    public async Task Valid_import_response_preserves_zero_counts()
+    public async Task ImportDiagnoses_ValidZeroCounts_ShouldPreserveCounts()
     {
         using var http = CreateClient(HttpStatusCode.OK, """{"created":0,"updated":0,"unchanged":1}""");
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("Code,Name\nA00.00,Холера"));
@@ -109,7 +109,7 @@ public sealed class ApiClientTests
     }
 
     [Fact]
-    public async Task Delete_accepts_no_content()
+    public async Task DeleteWorker_NoContentResponse_ShouldSucceed()
     {
         using var http = CreateClient(HttpStatusCode.NoContent, "");
 
@@ -119,7 +119,7 @@ public sealed class ApiClientTests
     [Theory]
     [InlineData("workers")]
     [InlineData("import")]
-    public async Task Caller_cancellation_is_not_reported_as_an_invalid_response(string operation)
+    public async Task Send_CallerCancellation_ShouldPropagateCancellation(string operation)
     {
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -131,7 +131,7 @@ public sealed class ApiClientTests
     }
 
     private static Task
-        RequestAsync(string operation, HttpClient http, CancellationToken cancellationToken = default) =>
+        RequestAsync(string operation, HttpClient http, CancellationToken cancellationToken) =>
         operation switch
         {
             "workers" => new MedicalWorkersApiClient(http).ListAsync(true, cancellationToken),

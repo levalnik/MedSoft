@@ -19,7 +19,7 @@
       <div class="mr-field">
         <label for="user-name">Логин</label>
         <InputText id="user-name" class="form-control" @bind-Value="_form.UserName" autocomplete="username"
-                   autocapitalize="none" spellcheck="false" maxlength="64"/>
+                   autocapitalize="none" spellcheck="false" minlength="3" maxlength="16"/>
         <ValidationMessage For="() => _form.UserName"/>
       </div>
       <div class="mr-field">
@@ -93,7 +93,8 @@
   private sealed class Credentials
   {
     [Required(ErrorMessage = "Укажите логин.")]
-    [StringLength(64, ErrorMessage = "Логин: не более 64 символов.")]
+    [StringLength(AccountUserNameRules.MaxLength, MinimumLength = AccountUserNameRules.MinLength,
+      ErrorMessage = "Логин: от 3 до 16 символов.")]
     public string UserName { get; set; } = "";
 
     [Required(ErrorMessage = "Укажите пароль.")]

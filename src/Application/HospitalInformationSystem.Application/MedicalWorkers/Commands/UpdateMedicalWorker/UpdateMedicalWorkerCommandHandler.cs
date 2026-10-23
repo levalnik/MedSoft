@@ -17,7 +17,7 @@ public sealed class UpdateMedicalWorkerCommandHandler(
         var worker = await repository.FindAsync(request.Id, tracking: true, cancellationToken)
                      ?? throw new EntityNotFoundException("Медработник не найден.");
         MedicalWorkerService.Update(worker, request.FirstName, request.LastName, request.Position,
-            timeProvider.GetUtcNow());
+            timeProvider.GetUtcNow(), request.Role is { } role ? Mapping.MedicalWorkerMapping.ToDomain(role) : null);
         await repository.UpdateAsync(worker, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Mapping.MedicalWorkerMapping.ToDto(worker);

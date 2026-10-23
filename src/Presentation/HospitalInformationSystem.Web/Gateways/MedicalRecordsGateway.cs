@@ -1,6 +1,6 @@
 using System.Net;
 using HospitalInformationSystem.Contracts.Auth;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Web.ApiClients;
 using HospitalInformationSystem.Web.Authentication;
@@ -9,35 +9,35 @@ namespace HospitalInformationSystem.Web.Gateways;
 
 public sealed class MedicalRecordsGateway(MedicalRecordsApiClient client, SessionState session) : IMedicalRecordsGateway
 {
-    public Task<MedicalRecordDto?> FindForPatientAsync(Guid patientId, CancellationToken cancellationToken = default) =>
+    public Task<MedicalRecordDto?> FindForPatientAsync(Guid patientId, CancellationToken cancellationToken) =>
         client.FindForPatientAsync(patientId, cancellationToken);
 
-    public Task<MedicalRecordDto> CreateAsync(Guid patientId, CancellationToken cancellationToken = default) =>
+    public Task<MedicalRecordDto> CreateAsync(Guid patientId, CancellationToken cancellationToken) =>
         client.CreateAsync(patientId, RequireAuthor(creating: true), cancellationToken);
 
-    public Task AddDiagnosisAsync(Guid recordId, Guid diagnosisId, CancellationToken cancellationToken = default) =>
+    public Task AddDiagnosisAsync(Guid recordId, Guid diagnosisId, CancellationToken cancellationToken) =>
         client.AddDiagnosisAsync(recordId, diagnosisId, RequireAuthor(), cancellationToken);
 
     public Task RemoveDiagnosisAsync(Guid recordId, Guid medicalRecordDiagnosisId,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken) =>
         client.RemoveDiagnosisAsync(recordId, medicalRecordDiagnosisId, RequireAuthor(), cancellationToken);
 
-    public Task AddPrescriptionAsync(Guid recordId, string text, CancellationToken cancellationToken = default) =>
+    public Task AddPrescriptionAsync(Guid recordId, string text, CancellationToken cancellationToken) =>
         client.AddPrescriptionAsync(recordId, text, RequireAuthor(), cancellationToken);
 
     public Task CancelPrescriptionAsync(Guid recordId, Guid prescriptionId,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken) =>
         client.CancelPrescriptionAsync(recordId, prescriptionId, RequireAuthor(), cancellationToken);
 
     public Task ReplacePrescriptionAsync(Guid recordId, Guid prescriptionId, string text,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken) =>
         client.ReplacePrescriptionAsync(recordId, prescriptionId, text, RequireAuthor(), cancellationToken);
 
     public Task<IReadOnlyList<MedicalRecordHistoryEventDto>> GetHistoryAsync(Guid recordId,
-        CancellationToken cancellationToken = default) => client.GetHistoryAsync(recordId, cancellationToken);
+        CancellationToken cancellationToken) => client.GetHistoryAsync(recordId, cancellationToken);
 
     public Task<MedicalRecordSnapshotDto> GetSnapshotAsync(Guid recordId, DateTimeOffset at,
-        CancellationToken cancellationToken = default) => client.GetSnapshotAsync(recordId, at, cancellationToken);
+        CancellationToken cancellationToken) => client.GetSnapshotAsync(recordId, at, cancellationToken);
 
     private Guid RequireAuthor(bool creating = false)
     {

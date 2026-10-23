@@ -9,6 +9,11 @@ internal static partial class MedicalWorkerMapping
 {
     [MapperIgnoreSource(nameof(MedicalWorker.CreatedAtUtc))]
     [MapperIgnoreSource(nameof(MedicalWorker.UpdatedAtUtc))]
-    [MapperIgnoreTarget(nameof(MedicalWorkerDto.Role))]
     public static partial MedicalWorkerDto ToDto(this MedicalWorker worker);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial MedicalWorkerRole ToDomain(this Contracts.Security.MedicalWorkerRole role);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial Contracts.Security.MedicalWorkerRole ToContract(this MedicalWorkerRole role);
 }

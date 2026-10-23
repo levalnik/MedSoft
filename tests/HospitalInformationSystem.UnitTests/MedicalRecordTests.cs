@@ -22,7 +22,7 @@ public sealed class MedicalRecordTests
     private static MedicalWorker Author() => MedicalWorkerFactory.Create("Алексей", "Иванов", "Врач", Now);
 
     [Fact]
-    public void Creation_records_patient_and_author_snapshot_in_utc()
+    public void Create_ValidPatientAndAuthor_ShouldStoreAuthorSnapshotAndUtcTime()
     {
         var author = Author();
         var patientId = Guid.NewGuid();
@@ -46,7 +46,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Replacement_preserves_original_text_and_emits_two_ordered_events_at_same_time()
+    public void ReplacePrescription_ValidReplacement_ShouldPreserveOriginalAndAppendOrderedEvents()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -75,7 +75,7 @@ public sealed class MedicalRecordTests
     [InlineData("  ")]
     [InlineData("аб")]
     [InlineData("  аб  ")]
-    public void Invalid_replacement_does_not_cancel_original_or_append_history(string? text)
+    public void ReplacePrescription_InvalidText_ShouldPreserveOriginalAndHistory(string? text)
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -93,7 +93,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Prescription_boundaries_are_checked_before_changes()
+    public void AddPrescription_InvalidBoundaries_ShouldRejectBeforeMutation()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -107,7 +107,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Repeated_cancel_and_replace_of_cancelled_prescription_are_conflicts_without_new_history()
+    public void CancelAndReplacePrescription_AlreadyCancelled_ShouldConflictWithoutNewHistory()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -126,7 +126,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Diagnosis_removal_keeps_historical_data_and_repeated_removal_conflicts()
+    public void RemoveDiagnosis_RepeatedRemoval_ShouldPreserveHistoryAndConflict()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -149,7 +149,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Child_from_another_record_is_not_found_and_does_not_change_state()
+    public void RemoveDiagnosis_DifferentRecordChild_ShouldReturnNotFoundWithoutMutation()
     {
         var author = Author();
         var first = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -168,7 +168,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Deleted_author_cannot_create_or_change_medical_records()
+    public void CreateAndUpdate_DeletedAuthor_ShouldRejectMutation()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -192,7 +192,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Clock_rollback_keeps_events_and_current_state_at_monotonic_utc_time()
+    public void AddDiagnosis_ClockRollback_ShouldKeepMonotonicUtcTime()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -206,7 +206,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Unordered_restored_history_uses_latest_version_when_clock_moves_backwards()
+    public void AddDiagnosis_UnorderedRestoredHistory_ShouldUseLatestVersionAfterClockRollback()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);
@@ -224,7 +224,7 @@ public sealed class MedicalRecordTests
     }
 
     [Fact]
-    public void Current_dto_omits_removed_diagnoses_and_cancelled_prescriptions()
+    public void Map_RemovedDiagnosesAndCancelledPrescriptions_ShouldOmitInactiveEntries()
     {
         var author = Author();
         var record = MedicalRecordFactory.Create(Guid.NewGuid(), author, Now);

@@ -54,6 +54,7 @@
 
 @code {
   private bool IsMedical => Session.Current?.Role == ApplicationRoles.MedicalWorker;
+  private readonly CancellationTokenSource _cancellation = new();
   private bool _loggingOut;
   private string? _logoutError;
   protected override void OnInitialized()
@@ -76,8 +77,12 @@
     try
     {
       var loginPath = Session.Current?.Role == ApplicationRoles.Administrator ? "/admin/login" : "/login";
-      await SessionsApi.LogoutAsync(CancellationToken.None);
-      Navigation.NavigateTo(loginPath, replace: true);
+      await SessionsApi.LogoutAsync(_cancellation.Token);
+      if (!_cancellation.IsCancellationRequested)
+        Navigation.NavigateTo(loginPath, replace: true);
+    }
+    catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+    {
     }
     catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException)
     {
@@ -91,6 +96,8 @@
 
   public void Dispose()
   {
+    _cancellation.Cancel();
+    _cancellation.Dispose();
     Navigation.LocationChanged -= OnLocationChanged;
     Session.Changed -= OnSessionChanged;
   }

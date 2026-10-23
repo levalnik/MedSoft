@@ -1,16 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace HospitalInformationSystem.Contracts.Lab2;
-
-[JsonConverter(typeof(MedicalWorkerRoleJsonConverter))]
-public enum MedicalWorkerRole
-{
-    Doctor,
-    LaboratoryTechnician,
-    Nurse,
-    Other
-}
+namespace HospitalInformationSystem.Contracts.Security;
 
 public sealed class MedicalWorkerRoleJsonConverter : JsonConverter<MedicalWorkerRole>
 {

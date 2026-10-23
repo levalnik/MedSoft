@@ -19,7 +19,7 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
     private readonly HttpClient _client = factory.CreateBusinessClient();
 
     [Fact]
-    public async Task Patient_update_is_persisted_and_patient_without_record_is_physically_deleted()
+    public async Task UpdateAndDeletePatient_NoMedicalRecord_ShouldPersistUpdateAndDeletePatient()
     {
         var response = await _client.PostAsJsonAsync("/api/patients", new SavePatientRequest(
             " Елена ", "Соколова", " ", new DateOnly(1985, 3, 12), AdministrativeSex.Female, " Аллергия "));
@@ -59,7 +59,7 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
     [InlineData("Елена", "123456789012345678901234567890123", "Female")]
     [InlineData("Елена", null, "999")]
     [InlineData("Елена", null, "InvalidSex")]
-    public async Task Invalid_patient_fields_or_sex_return_400_without_inserting(string? firstName, string? comment,
+    public async Task CreatePatient_InvalidFieldsOrSex_ShouldReturnBadRequestWithoutInsert(string? firstName, string? comment,
         string sex)
     {
         await using var scope = factory.Services.CreateAsyncScope();
@@ -83,7 +83,7 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
     [InlineData("A00.000", "Холера")]
     [InlineData("A00.00", "АБ")]
     [InlineData("A00.00", "1234567890123456789012345")]
-    public async Task Invalid_diagnosis_lengths_return_validation_problem_without_inserting(string code, string name)
+    public async Task CreateDiagnosis_InvalidLengths_ShouldReturnValidationProblemWithoutInsert(string code, string name)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HospitalDbContext>();
@@ -96,7 +96,7 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
     }
 
     [Fact]
-    public async Task Diagnosis_uniqueness_conflicts_return_409_and_successful_update_and_delete_are_persisted()
+    public async Task UpdateAndDeleteDiagnosis_UniqueAndDuplicateValues_ShouldPersistValidChangesAndConflictOnDuplicates()
     {
         var token = Guid.NewGuid().ToString("N");
         var code = token[..6];
@@ -139,7 +139,7 @@ public sealed class PatientsAndDiagnosesApiTests(HospitalApiFactory factory) : I
     [InlineData("diagnoses", "GET")]
     [InlineData("diagnoses", "PUT")]
     [InlineData("diagnoses", "DELETE")]
-    public async Task Unknown_entity_returns_404_problem(string route, string method)
+    public async Task Send_UnknownEntity_ShouldReturnNotFoundProblem(string route, string method)
     {
         using var request = new HttpRequestMessage(new HttpMethod(method), $"/api/{route}/{Guid.NewGuid()}");
         if (method == "PUT")

@@ -15,7 +15,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
     [Theory]
     [InlineData(LoginPortal.Administrator, HttpStatusCode.OK)]
     [InlineData(LoginPortal.MedicalWorker, HttpStatusCode.Unauthorized)]
-    public async Task The_selected_portal_does_not_change_the_administrators_actual_role(
+    public async Task Login_SelectedPortal_ShouldPreserveActualAdministratorRole(
         LoginPortal portal, HttpStatusCode expected)
     {
         using var client = factory.CreateCookieClient();
@@ -34,7 +34,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
     }
 
     [Fact]
-    public async Task A_medical_worker_cannot_enter_the_administrator_portal_with_a_valid_password()
+    public async Task Login_MedicalWorkerAtAdministratorPortal_ShouldRejectValidCredentials()
     {
         using var administrator = factory.CreateCookieClient();
         await SetCsrfAsync(administrator);
@@ -47,7 +47,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
         createdWorker.EnsureSuccessStatusCode();
         var worker = (await createdWorker.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
         const string password = "Integration.Portal-Only.6249!";
-        var name = "portal." + Guid.NewGuid().ToString("N");
+        var name = "portal." + Guid.NewGuid().ToString("N")[..9];
         using var createdAccount = await administrator.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest(name, password, ApplicationRoles.MedicalWorker, worker.Id));
         createdAccount.EnsureSuccessStatusCode();
@@ -68,7 +68,7 @@ public sealed class LoginPortalApiTests(SecureHospitalApiFactory factory) : ICla
     }
 
     [Fact]
-    public async Task The_cookie_backend_does_not_silently_accept_an_unverified_totp_code()
+    public async Task Login_CookieBackendWithTotpCode_ShouldRejectUnverifiedCode()
     {
         using var client = factory.CreateCookieClient();
         await SetCsrfAsync(client);

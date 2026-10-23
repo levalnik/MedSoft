@@ -10,7 +10,7 @@ namespace HospitalInformationSystem.IntegrationTests;
 
 public sealed class SecureHospitalApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    public const string AdminUserName = "integration.admin";
+    public const string AdminUserName = "it.admin";
     public const string AdminPassword = "Integration.Admin-Only.6249!";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")

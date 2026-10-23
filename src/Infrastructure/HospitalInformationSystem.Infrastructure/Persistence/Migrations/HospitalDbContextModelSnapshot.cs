@@ -35,12 +35,27 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsAdministrator")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -56,8 +71,9 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.Property<string>("NormalizedUserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
@@ -74,11 +90,22 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
                     b.Property<string>("UserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IsAdministrator")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AspNetUsers_SingleAdministrator")
+                        .HasFilter("\"IsAdministrator\" = TRUE");
 
                     b.HasIndex("MedicalWorkerId")
                         .IsUnique();
@@ -90,7 +117,131 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("AspNetUsers", (string)null);
+                    b.ToTable("AspNetUsers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_admin_worker", "NOT \"IsAdministrator\" OR \"MedicalWorkerId\" IS NULL");
+
+                            t.HasCheckConstraint("ck_users_dates", "\"UpdatedAtUtc\" >= \"CreatedAtUtc\"");
+
+                            t.HasCheckConstraint("ck_users_normalized_username", "\"NormalizedUserName\" IS NOT NULL AND \"NormalizedUserName\" = upper(\"UserName\")");
+
+                            t.HasCheckConstraint("ck_users_username", "\"UserName\" IS NOT NULL AND \"UserName\" ~ '^[A-Za-z0-9._@+-]{3,16}$'");
+                        });
+                });
+
+            modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.AdministratorSetupStateDbo", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AdministratorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("administrator_user_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_completed");
+
+                    b.Property<string>("TotpSecretProtected")
+                        .HasColumnType("text")
+                        .HasColumnName("totp_secret_protected");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdministratorUserId");
+
+                    b.ToTable("administrator_setup_state", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_setup_completion", "NOT is_completed OR (administrator_user_id IS NOT NULL AND totp_secret_protected IS NOT NULL AND completed_at_utc IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_setup_dates", "updated_at_utc >= created_at_utc AND (completed_at_utc IS NULL OR completed_at_utc >= created_at_utc)");
+
+                            t.HasCheckConstraint("ck_setup_singleton", "id = 1");
+                        });
+                });
+
+            modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.AuditEventDbo", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("ActorDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor_display_name");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("actor_kind");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("Component")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("component");
+
+                    b.Property<DateTimeOffset>("EventTimeUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("event_time_utc");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("RequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_id");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("EventTimeUtc", "EventId");
+
+                    b.HasIndex("EventType", "EventTimeUtc", "EventId");
+
+                    b.ToTable("security_audit_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_audit_actor", "actor_kind IN ('user', 'anonymous', 'system') AND ((actor_kind = 'user' AND actor_user_id IS NOT NULL) OR (actor_kind <> 'user' AND actor_user_id IS NULL))");
+                        });
                 });
 
             modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.DiagnosisDefinitionDbo", b =>
@@ -333,6 +484,14 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(24)")
                         .HasColumnName("position");
 
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("other")
+                        .HasColumnName("role");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
@@ -347,11 +506,13 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("medical_workers", null, t =>
                         {
-                            t.HasCheckConstraint("ck_medical_workers_first_name", "char_length(btrim(first_name)) BETWEEN 3 AND 24");
+                            t.HasCheckConstraint("ck_medical_workers_first_name", "char_length(btrim(first_name)) BETWEEN 1 AND 24");
 
-                            t.HasCheckConstraint("ck_medical_workers_last_name", "char_length(btrim(last_name)) BETWEEN 3 AND 24");
+                            t.HasCheckConstraint("ck_medical_workers_last_name", "char_length(btrim(last_name)) BETWEEN 1 AND 24");
 
                             t.HasCheckConstraint("ck_medical_workers_position", "char_length(btrim(position)) BETWEEN 3 AND 24");
+
+                            t.HasCheckConstraint("ck_medical_workers_role", "role IN ('doctor', 'laboratory-technician', 'nurse', 'other')");
                         });
                 });
 
@@ -473,6 +634,74 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_prescriptions_cancellation", "(cancelled_at_utc IS NULL) = (cancelled_by_medical_worker_id IS NULL)");
 
                             t.HasCheckConstraint("ck_prescriptions_text", "char_length(btrim(text)) BETWEEN 3 AND 128");
+                        });
+                });
+
+            modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.RefreshSessionDbo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("family_id");
+
+                    b.Property<Guid?>("ReplacedBySessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replaced_by_session_id");
+
+                    b.Property<string>("RevokeReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("revoke_reason");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamilyId");
+
+                    b.HasIndex("ReplacedBySessionId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "RevokedAtUtc");
+
+                    b.ToTable("refresh_sessions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_refresh_dates", "expires_at_utc > created_at_utc AND (revoked_at_utc IS NULL OR revoked_at_utc >= created_at_utc)");
+
+                            t.HasCheckConstraint("ck_refresh_hash", "token_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_refresh_replacement", "replaced_by_session_id IS NULL OR (revoked_at_utc IS NOT NULL AND replaced_by_session_id <> id)");
                         });
                 });
 
@@ -614,6 +843,14 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.AdministratorSetupStateDbo", b =>
+                {
+                    b.HasOne("HospitalInformationSystem.Infrastructure.Identity.HospitalUser", null)
+                        .WithMany()
+                        .HasForeignKey("AdministratorUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.MedicalRecordDbo", b =>
                 {
                     b.HasOne("HospitalInformationSystem.Infrastructure.Persistence.Models.PatientDbo", null)
@@ -686,6 +923,20 @@ namespace HospitalInformationSystem.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ReplacesPrescriptionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("HospitalInformationSystem.Infrastructure.Persistence.Models.RefreshSessionDbo", b =>
+                {
+                    b.HasOne("HospitalInformationSystem.Infrastructure.Persistence.Models.RefreshSessionDbo", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacedBySessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HospitalInformationSystem.Infrastructure.Identity.HospitalUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

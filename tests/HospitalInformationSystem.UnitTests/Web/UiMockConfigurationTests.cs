@@ -7,7 +7,7 @@ namespace HospitalInformationSystem.UnitTests.Web;
 public sealed class UiMockConfigurationTests
 {
     [Fact]
-    public void Mock_is_disabled_without_an_explicit_setting()
+    public void IsEnabled_MissingExplicitSetting_ShouldDisableMock()
     {
         var configuration = new ConfigurationBuilder().Build();
 
@@ -17,13 +17,13 @@ public sealed class UiMockConfigurationTests
     [Theory]
     [InlineData("Development")]
     [InlineData("UiMock")]
-    public void Explicit_mock_setting_is_allowed_only_for_development(string environment)
+    public void IsEnabled_ExplicitMockSetting_ShouldAllowDevelopmentEnvironment(string environment)
     {
         UiMockOptions.FromConfiguration(EnabledConfiguration(), environment).Enabled.Should().BeTrue();
     }
 
     [Fact]
-    public void Missing_mock_configuration_cannot_silently_use_a_real_API()
+    public void Validate_MissingMockConfiguration_ShouldRejectRealApiFallback()
     {
         var action = () => UiMockOptions.FromConfiguration(new ConfigurationBuilder().Build(), "UiMock");
 
@@ -33,7 +33,7 @@ public sealed class UiMockConfigurationTests
     [Theory]
     [InlineData("Production")]
     [InlineData("Staging")]
-    public void Mock_cannot_be_enabled_for_a_deployed_environment(string environment)
+    public void IsEnabled_DeployedEnvironment_ShouldRejectEnabledMock(string environment)
     {
         var action = () => UiMockOptions.FromConfiguration(EnabledConfiguration(), environment);
 

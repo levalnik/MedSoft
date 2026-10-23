@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using FluentValidation;
@@ -17,10 +18,10 @@ namespace HospitalInformationSystem.UnitTests;
 public sealed class DiagnosisCsvImportTests
 {
     [Fact]
-    public void Parser_handles_bom_crlf_commas_escaped_quotes_and_multiline_fields()
+    public void Parse_QuotedMultilineCsv_ShouldHandleBomNewlinesAndEscapes()
     {
         var rows = DiagnosisCsvParser.Parse(
-            "\uFEFFCode,Name\r\n A00.00 , \"Боль, \"\"острая\"\"\"\r\nB00.00,\"Первая\r\nвторая\"\r\n");
+            "\uFEFFCode,Name\r\n A00.00 , \"Боль, \"\"острая\"\"\"\r\nB00.00,\"Первая\r\nвторая\"\r\n", CancellationToken.None);
         rows.Should().HaveCount(2);
         rows[0].Should().Be(new DiagnosisCsvRow(2, "A00.00", "Боль, \"острая\""));
         rows[1].Name.Should().Be("Первая\r\nвторая");
@@ -37,24 +38,24 @@ public sealed class DiagnosisCsvImportTests
     [InlineData("Code,Name\nA00.00")]
     [InlineData("Code,Name\nA00.00,Боль,extra")]
     [InlineData("Code,Name\nA00.00,\"Открытые кавычки")]
-    public void Invalid_csv_is_rejected(string csv)
+    public void Parse_InvalidCsv_ShouldRejectInput(string csv)
     {
-        var action = () => DiagnosisCsvParser.Parse(csv);
+        var action = () => DiagnosisCsvParser.Parse(csv, CancellationToken.None);
         action.Should().Throw<ValidationException>();
     }
 
     [Fact]
-    public void Row_limit_is_enforced()
+    public void Parse_RowLimitExceeded_ShouldRejectInput()
     {
         var action = () => DiagnosisCsvParser.Parse("Code,Name\n" + string.Concat(
-            Enumerable.Repeat("A00.00,Боль\n", DiagnosisImportLimits.MaxRows + 1)));
+            Enumerable.Repeat("A00.00,Боль\n", DiagnosisImportLimits.MaxRows + 1)), CancellationToken.None);
         action.Should().Throw<ValidationException>().WithMessage("*10000*");
     }
 
     [Fact]
-    public void Blank_lines_preserve_physical_line_numbers()
+    public void Parse_BlankLines_ShouldPreservePhysicalLineNumbers()
     {
-        var rows = DiagnosisCsvParser.Parse("Code,Name\n\n \t\nA00.00,Первый\n\nB00.00,Второй\n");
+        var rows = DiagnosisCsvParser.Parse("Code,Name\n\n \t\nA00.00,Первый\n\nB00.00,Второй\n", CancellationToken.None);
         rows.Select(x => x.Line).Should().Equal(4L, 6L);
     }
 
@@ -63,7 +64,7 @@ public sealed class DiagnosisCsvImportTests
     [InlineData("A00.00,Боль\nB00.00, Боль ", "повтор названия")]
     [InlineData("A00.00,Боль\nSHORT,Другое", "ровно 6")]
     [InlineData("A00.00,Боль\nB00.00,Аб", "от 3 до 24")]
-    public async Task Invalid_rows_do_not_reach_repository(string data, string expected)
+    public async Task Import_InvalidRows_ShouldNotReachRepository(string data, string expected)
     {
         var repository = new Mock<IDiagnosisRepository>(MockBehavior.Strict);
         var unitOfWork = new Mock<IUnitOfWork>(MockBehavior.Strict);
@@ -78,7 +79,7 @@ public sealed class DiagnosisCsvImportTests
     }
 
     [Fact]
-    public async Task Identical_import_does_not_update_or_save_any_rows()
+    public async Task Import_IdenticalRows_ShouldNotUpdateOrSave()
     {
         var diagnosis = DiagnosisDefinitionFactory.Create("A00.00", "Первый диагноз", DateTimeOffset.UtcNow);
         var repository = new Mock<IDiagnosisRepository>(MockBehavior.Strict);

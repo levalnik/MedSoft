@@ -16,7 +16,7 @@ public sealed partial class UiMockHttpMessageHandler
         if (ValidateAuthor(request) is { } error) return error;
         if (existing is not null) return Error(HttpStatusCode.Conflict, "У пациента уже есть ЭМК.");
         var at = DateTimeOffset.UtcNow;
-        var record = new UiMockState.MockMedicalRecord(new MedicalRecordDto(Guid.NewGuid(), patientId,
+        var record = new MockMedicalRecord(new MedicalRecordDto(Guid.NewGuid(), patientId,
             at, 0, [], []));
         state.Records.Add(record.Current.Id, record);
         state.Patients[patientId] = patient with { HasMedicalRecord = true };

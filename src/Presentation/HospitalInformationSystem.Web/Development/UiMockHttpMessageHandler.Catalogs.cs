@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using HospitalInformationSystem.Contracts.Diagnoses;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Contracts.Patients;
 

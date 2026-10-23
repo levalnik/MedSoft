@@ -1,10 +1,10 @@
 using System.Text.Json;
 using FluentAssertions;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 
 namespace HospitalInformationSystem.UnitTests.Web;
 
-public sealed class Lab2FixtureTests
+public sealed class SecurityFixtureTests
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {
@@ -13,10 +13,10 @@ public sealed class Lab2FixtureTests
     };
 
     [Fact]
-    public void Shared_JSON_examples_match_the_contracts_used_by_pages_and_gateways()
+    public void Deserialize_SharedJsonExamples_ShouldMatchPageAndGatewayContracts()
     {
         var session = Read<AuthenticationSessionDto>("session-doctor.json");
-        var accounts = Read<Lab2AccountDto[]>("accounts.json");
+        var accounts = Read<AccountDetailsDto[]>("accounts.json");
         var audit = Read<PagedResult<AuditEventDto>>("audit-page.json");
         var setup = Read<SetupChallengeDto>("setup-challenge.json");
 
@@ -28,5 +28,5 @@ public sealed class Lab2FixtureTests
     }
 
     private static T Read<T>(string name) => JsonSerializer.Deserialize<T>(
-        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Lab2", name)), Options)!;
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Security", name)), Options)!;
 }

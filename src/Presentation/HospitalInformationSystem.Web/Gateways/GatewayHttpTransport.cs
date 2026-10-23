@@ -4,7 +4,7 @@ using HospitalInformationSystem.Web.ApiClients;
 
 namespace HospitalInformationSystem.Web.Gateways;
 
-internal static class Lab2ApiTransport
+internal static class GatewayHttpTransport
 {
     public static async Task<T> SendAsync<T>(HttpClient http, HttpMethod method, string uri, object? body,
         CancellationToken cancellationToken, string? setupToken = null)

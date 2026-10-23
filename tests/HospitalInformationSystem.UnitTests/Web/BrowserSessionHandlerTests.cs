@@ -11,7 +11,7 @@ namespace HospitalInformationSystem.UnitTests.Web;
 public sealed class BrowserSessionHandlerTests
 {
     [Fact]
-    public async Task Unsafe_requests_include_credentials_and_reuse_the_antiforgery_token()
+    public async Task Send_UnsafeRequest_ShouldIncludeCredentialsAndReuseAntiforgeryToken()
     {
         var requests = new List<(string Path, string? Token, object? Credentials)>();
         var state = new SessionState();
@@ -42,7 +42,7 @@ public sealed class BrowserSessionHandlerTests
     }
 
     [Fact]
-    public async Task Concurrent_writes_share_one_antiforgery_cookie_request()
+    public async Task Send_ConcurrentWrites_ShouldShareAntiforgeryCookieRequest()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -71,7 +71,7 @@ public sealed class BrowserSessionHandlerTests
     }
 
     [Fact]
-    public async Task A_token_loaded_before_invalidation_is_not_cached_or_used()
+    public async Task Send_TokenInvalidatedDuringLoad_ShouldNotCacheOrUseOldToken()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var staleResponse = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -109,7 +109,7 @@ public sealed class BrowserSessionHandlerTests
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, true)]
     [InlineData(HttpStatusCode.Forbidden, false)]
-    public async Task Only_unauthorized_responses_end_the_current_session(HttpStatusCode status, bool expires)
+    public async Task Send_ResponseStatus_ShouldEndSessionOnlyWhenUnauthorized(HttpStatusCode status, bool expires)
     {
         var state = new SessionState();
         var account = new SessionDto(Guid.NewGuid(), "doctor", ApplicationRoles.MedicalWorker, Guid.NewGuid());
@@ -125,7 +125,7 @@ public sealed class BrowserSessionHandlerTests
     }
 
     [Fact]
-    public async Task Late_unauthorized_response_does_not_clear_a_new_session()
+    public async Task Send_LateUnauthorizedResponse_ShouldPreserveNewSession()
     {
         var response = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         var state = new SessionState();
@@ -142,7 +142,7 @@ public sealed class BrowserSessionHandlerTests
     }
 
     [Fact]
-    public async Task Login_and_logout_invalidate_tokens_bound_to_the_previous_identity()
+    public async Task LoginAndLogout_IdentityChange_ShouldInvalidatePreviousAntiforgeryTokens()
     {
         var current = new SessionDto(Guid.NewGuid(), "doctor", ApplicationRoles.MedicalWorker, Guid.NewGuid());
         var state = new SessionState();
@@ -169,7 +169,7 @@ public sealed class BrowserSessionHandlerTests
     }
 
     [Fact]
-    public async Task Authentication_state_contains_the_server_role_and_linked_medical_worker()
+    public async Task GetAuthenticationState_ServerSession_ShouldIncludeRoleAndWorker()
     {
         var state = new SessionState();
         var workerId = Guid.NewGuid();
@@ -191,7 +191,7 @@ public sealed class BrowserSessionHandlerTests
     [InlineData(HttpStatusCode.ServiceUnavailable, false)]
     [InlineData(HttpStatusCode.OK, true)]
     [InlineData(HttpStatusCode.ServiceUnavailable, true)]
-    public async Task Late_session_initialization_cannot_overwrite_a_new_login_or_logout(
+    public async Task InitializeSession_LateResponse_ShouldPreserveNewLoginOrLogout(
         HttpStatusCode status, bool loggedOut)
     {
         var response = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -1,10 +1,11 @@
+using System.Threading;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.Auth;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Web.ApiClients;
@@ -13,7 +14,7 @@ using HospitalInformationSystem.Web.Gateways;
 
 namespace HospitalInformationSystem.UnitTests.Web;
 
-public sealed class Lab2ContractTests
+public sealed class GatewayContractTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -26,7 +27,7 @@ public sealed class Lab2ContractTests
     [InlineData(MedicalWorkerRole.LaboratoryTechnician, "laboratory-technician")]
     [InlineData(MedicalWorkerRole.Nurse, "nurse")]
     [InlineData(MedicalWorkerRole.Other, "other")]
-    public void Medical_role_has_explicit_stable_wire_value(MedicalWorkerRole role, string wireValue)
+    public void Serialize_MedicalRole_ShouldUseStableExplicitWireValue(MedicalWorkerRole role, string wireValue)
     {
         var json = JsonSerializer.Serialize(role, JsonOptions);
 
@@ -41,7 +42,7 @@ public sealed class Lab2ContractTests
     [InlineData("\"Doctor\"")]
     [InlineData("\"laboratoryTechnician\"")]
     [InlineData("\"Administrator\"")]
-    public void Numeric_unknown_or_ambiguous_medical_roles_are_rejected(string json)
+    public void Deserialize_NumericUnknownOrAmbiguousMedicalRole_ShouldRejectValue(string json)
     {
         var action = () => JsonSerializer.Deserialize<MedicalWorkerRole>(json, JsonOptions);
 
@@ -49,7 +50,7 @@ public sealed class Lab2ContractTests
     }
 
     [Fact]
-    public void Old_worker_and_session_wire_contracts_remain_readable_without_new_roles()
+    public void Deserialize_LegacyWorkerAndSession_ShouldAllowMissingMedicalRoles()
     {
         var id = Guid.NewGuid();
         var worker = JsonSerializer.Deserialize<MedicalWorkerDto>($$"""
@@ -69,35 +70,35 @@ public sealed class Lab2ContractTests
     [InlineData(MedicalWorkerRole.Nurse, true, false)]
     [InlineData(MedicalWorkerRole.LaboratoryTechnician, false, false)]
     [InlineData(MedicalWorkerRole.Other, false, false)]
-    public void Shared_UI_permissions_follow_the_lab2_matrix(MedicalWorkerRole role, bool canCreate, bool canEdit)
+    public void GetPermissions_MedicalRole_ShouldMatchClinicalPermissionMatrix(MedicalWorkerRole role, bool canCreate, bool canEdit)
     {
         var session = new AuthenticationSessionDto(Guid.NewGuid(), "demo", ApplicationRoles.MedicalWorker,
             Guid.NewGuid(), role);
 
-        Lab2SessionPermissions.CanReadClinicalData(session).Should().BeTrue();
-        Lab2SessionPermissions.CanManagePatients(session).Should().Be(canCreate);
-        Lab2SessionPermissions.CanCreateMedicalRecord(session).Should().Be(canCreate);
-        Lab2SessionPermissions.CanEditMedicalRecord(session).Should().Be(canEdit);
-        Lab2SessionPermissions.CanManageAdministration(session).Should().BeFalse();
+        SessionPermissions.CanReadClinicalData(session).Should().BeTrue();
+        SessionPermissions.CanManagePatients(session).Should().Be(canCreate);
+        SessionPermissions.CanCreateMedicalRecord(session).Should().Be(canCreate);
+        SessionPermissions.CanEditMedicalRecord(session).Should().Be(canEdit);
+        SessionPermissions.CanManageAdministration(session).Should().BeFalse();
     }
 
     [Fact]
-    public void Unknown_role_and_administrator_do_not_gain_clinical_permissions()
+    public void GetPermissions_UnknownRoleOrAdministrator_ShouldDenyClinicalAccess()
     {
         var unknown = new AuthenticationSessionDto(Guid.NewGuid(), "legacy", ApplicationRoles.MedicalWorker,
             Guid.NewGuid(), null);
         var admin = unknown with { AccountRole = ApplicationRoles.Administrator, MedicalWorkerRole = MedicalWorkerRole.Doctor };
 
-        Lab2SessionPermissions.CanReadClinicalData(unknown).Should().BeFalse();
-        Lab2SessionPermissions.CanCreateMedicalRecord(unknown).Should().BeFalse();
-        Lab2SessionPermissions.CanReadClinicalData(admin).Should().BeFalse();
-        Lab2SessionPermissions.CanEditMedicalRecord(admin).Should().BeFalse();
-        Lab2SessionPermissions.CanManageAdministration(admin).Should().BeTrue();
-        Lab2SessionPermissions.CanReadClinicalData(null).Should().BeFalse();
+        SessionPermissions.CanReadClinicalData(unknown).Should().BeFalse();
+        SessionPermissions.CanCreateMedicalRecord(unknown).Should().BeFalse();
+        SessionPermissions.CanReadClinicalData(admin).Should().BeFalse();
+        SessionPermissions.CanEditMedicalRecord(admin).Should().BeFalse();
+        SessionPermissions.CanManageAdministration(admin).Should().BeTrue();
+        SessionPermissions.CanReadClinicalData(null).Should().BeFalse();
     }
 
     [Fact]
-    public void Audit_actor_and_event_types_serialize_without_numbers()
+    public void Serialize_AuditActorAndEventTypes_ShouldUseNamesInsteadOfNumbers()
     {
         JsonSerializer.Serialize(AuditActorKind.Anonymous, JsonOptions).Should().Be("\"anonymous\"");
         JsonSerializer.Serialize(AuditEventType.AccountChanged, JsonOptions).Should().Be("\"AccountChanged\"");
@@ -110,18 +111,18 @@ public sealed class Lab2ContractTests
     [Theory]
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.NotImplemented)]
-    public async Task Unsupported_setup_is_an_error_instead_of_fake_success(HttpStatusCode status)
+    public async Task CompleteSetup_UnsupportedEndpoint_ShouldReturnError(HttpStatusCode status)
     {
         using var http = CreateHttp((_, _) => Task.FromResult(new HttpResponseMessage(status)));
         var gateway = CreateAuthenticationGateway(http, new SessionState());
 
-        var action = () => gateway.GetSetupStatusAsync();
+        var action = () => gateway.GetSetupStatusAsync(CancellationToken.None);
 
         (await action.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(status);
     }
 
     [Fact]
-    public async Task Setup_credential_is_sent_only_in_header()
+    public async Task CompleteSetup_SetupCredential_ShouldSendCredentialOnlyInHeader()
     {
         string? setupHeader = null;
         string? body = null;
@@ -137,14 +138,14 @@ public sealed class Lab2ContractTests
         });
 
         await CreateAuthenticationGateway(http, new SessionState()).BeginSetupAsync(
-            new BeginSetupRequest("SyntheticPassword1!", "SyntheticPassword1!"), "synthetic-setup-token");
+            new BeginSetupRequest("SyntheticPassword1!", "SyntheticPassword1!"), "synthetic-setup-token", CancellationToken.None);
 
         setupHeader.Should().Be("synthetic-setup-token");
         body.Should().NotContain("synthetic-setup-token");
     }
 
     [Fact]
-    public async Task Legacy_authentication_adapter_preserves_known_role_without_inventing_one()
+    public async Task GetSession_LegacyAuthentication_ShouldPreserveKnownRole()
     {
         var id = Guid.NewGuid();
         using var http = CreateHttp((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -153,7 +154,7 @@ public sealed class Lab2ContractTests
         }));
         var state = new SessionState();
 
-        var result = await CreateAuthenticationGateway(http, state).GetSessionAsync();
+        var result = await CreateAuthenticationGateway(http, state).GetSessionAsync(CancellationToken.None);
 
         result!.AccountRole.Should().Be(ApplicationRoles.MedicalWorker);
         result.MedicalWorkerId.Should().Be(id);
@@ -162,7 +163,7 @@ public sealed class Lab2ContractTests
     }
 
     [Fact]
-    public async Task Medical_adapter_derives_author_from_current_session_on_every_change()
+    public async Task MutateMedicalRecord_AuthenticatedSession_ShouldDeriveAuthorForEveryChange()
     {
         var authors = new List<string>();
         using var http = CreateHttp((request, _) =>
@@ -175,9 +176,9 @@ public sealed class Lab2ContractTests
         var secondAuthor = Guid.NewGuid();
         var gateway = new MedicalRecordsGateway(new MedicalRecordsApiClient(http), state);
         state.SetSession(new SessionDto(Guid.NewGuid(), "first", ApplicationRoles.MedicalWorker, firstAuthor));
-        await gateway.AddPrescriptionAsync(Guid.NewGuid(), "Учебное назначение");
+        await gateway.AddPrescriptionAsync(Guid.NewGuid(), "Учебное назначение", CancellationToken.None);
         state.SetSession(new SessionDto(Guid.NewGuid(), "second", ApplicationRoles.MedicalWorker, secondAuthor));
-        await gateway.AddPrescriptionAsync(Guid.NewGuid(), "Другое назначение");
+        await gateway.AddPrescriptionAsync(Guid.NewGuid(), "Другое назначение", CancellationToken.None);
 
         authors.Should().Equal(firstAuthor.ToString(), secondAuthor.ToString());
     }
@@ -185,7 +186,7 @@ public sealed class Lab2ContractTests
     [Theory]
     [InlineData(false, HttpStatusCode.Unauthorized)]
     [InlineData(true, HttpStatusCode.Forbidden)]
-    public async Task Medical_adapter_rejects_missing_or_nonmedical_session_before_sending(bool administrator,
+    public async Task MutateMedicalRecord_MissingOrNonmedicalSession_ShouldRejectBeforeSending(bool administrator,
         HttpStatusCode expectedStatus)
     {
         var sends = 0;
@@ -199,7 +200,7 @@ public sealed class Lab2ContractTests
             state.SetSession(new SessionDto(Guid.NewGuid(), "admin", ApplicationRoles.Administrator, null));
         var gateway = new MedicalRecordsGateway(new MedicalRecordsApiClient(http), state);
 
-        var action = () => gateway.AddPrescriptionAsync(Guid.NewGuid(), "Учебное назначение");
+        var action = () => gateway.AddPrescriptionAsync(Guid.NewGuid(), "Учебное назначение", CancellationToken.None);
 
         (await action.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(expectedStatus);
         sends.Should().Be(0);
@@ -212,7 +213,7 @@ public sealed class Lab2ContractTests
     [InlineData(MedicalWorkerRole.Other, false, false)]
     [InlineData((MedicalWorkerRole)999, false, false)]
     [InlineData(null, true, true)]
-    public async Task Medical_adapter_respects_known_role_permissions_and_keeps_legacy_compatibility(
+    public async Task MutateMedicalRecord_KnownOrLegacyRole_ShouldRespectPermissionsAndCompatibility(
         MedicalWorkerRole? role, bool canCreate, bool canEdit)
     {
         var sends = 0;
@@ -234,8 +235,8 @@ public sealed class Lab2ContractTests
             Guid.NewGuid(), role));
         var gateway = new MedicalRecordsGateway(new MedicalRecordsApiClient(http), state);
 
-        Func<Task> create = async () => await gateway.CreateAsync(patientId);
-        Func<Task> edit = () => gateway.AddPrescriptionAsync(Guid.NewGuid(), "Учебное назначение");
+        Func<Task> create = async () => await gateway.CreateAsync(patientId, CancellationToken.None);
+        Func<Task> edit = () => gateway.AddPrescriptionAsync(Guid.NewGuid(), "Учебное назначение", CancellationToken.None);
 
         if (canCreate) await create.Should().NotThrowAsync();
         else (await create.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -245,7 +246,7 @@ public sealed class Lab2ContractTests
     }
 
     [Fact]
-    public async Task Audit_adapter_rejects_null_event_instead_of_returning_a_broken_page()
+    public async Task ListAudit_NullEvent_ShouldRejectInvalidPage()
     {
         using var http = CreateHttp((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -254,13 +255,13 @@ public sealed class Lab2ContractTests
                 """, Encoding.UTF8, "application/json")
         }));
 
-        var action = () => new AuditGateway(http).ListAsync(new AuditQuery());
+        var action = () => new AuditGateway(http).ListAsync(new AuditQuery(), CancellationToken.None);
 
         await action.Should().ThrowAsync<ApiException>();
     }
 
     [Fact]
-    public async Task Audit_dates_are_encoded_as_UTC_and_filters_are_preserved()
+    public async Task ListAudit_DateAndFilterParameters_ShouldEncodeUtcDatesAndPreserveFilters()
     {
         Uri? requestedUri = null;
         using var http = CreateHttp((request, _) =>
@@ -273,7 +274,7 @@ public sealed class Lab2ContractTests
         });
         var from = new DateTimeOffset(2026, 10, 22, 15, 0, 0, TimeSpan.FromHours(3));
 
-        await new AuditGateway(http).ListAsync(new AuditQuery(2, 10, AuditEventType.AccountChanged, from));
+        await new AuditGateway(http).ListAsync(new AuditQuery(2, 10, AuditEventType.AccountChanged, from), CancellationToken.None);
 
         var query = Uri.UnescapeDataString(requestedUri!.Query);
         query.Should().Contain("page=2").And.Contain("pageSize=10").And.Contain("eventType=AccountChanged")

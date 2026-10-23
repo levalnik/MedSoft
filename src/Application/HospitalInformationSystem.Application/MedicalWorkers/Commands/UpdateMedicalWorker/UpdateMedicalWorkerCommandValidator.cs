@@ -7,8 +7,9 @@ public sealed class UpdateMedicalWorkerCommandValidator : AbstractValidator<Upda
 {
     public UpdateMedicalWorkerCommandValidator()
     {
-        RuleFor(x => x.FirstName).WorkerText("Имя");
-        RuleFor(x => x.LastName).WorkerText("Фамилия");
-        RuleFor(x => x.Position).WorkerText("Должность");
+        RuleFor(x => x.FirstName).WorkerText("Имя", 1);
+        RuleFor(x => x.LastName).WorkerText("Фамилия", 1);
+        RuleFor(x => x.Position).WorkerText("Должность", 3);
+        RuleFor(x => x.Role).IsInEnum().WithMessage("Неизвестная медицинская роль.");
     }
 }

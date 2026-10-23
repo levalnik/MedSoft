@@ -2,7 +2,7 @@
   <PropertyGroup><IsPackable>false</IsPackable><IsTestProject>true</IsTestProject></PropertyGroup>
   <ItemGroup><Using Include="Xunit" /></ItemGroup>
   <ItemGroup>
-    <None Update="Fixtures/Lab2/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/Security/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" />
@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Application/HospitalInformationSystem.Domain/HospitalInformationSystem.Domain.csproj" />
     <ProjectReference Include="../../src/Application/HospitalInformationSystem.Application/HospitalInformationSystem.Application.csproj" />
+    <ProjectReference Include="../../src/Infrastructure/HospitalInformationSystem.Infrastructure/HospitalInformationSystem.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Presentation/HospitalInformationSystem.Web/HospitalInformationSystem.Web.csproj" />
   </ItemGroup>
 </Project>

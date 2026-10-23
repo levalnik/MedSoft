@@ -32,7 +32,7 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     [InlineData("patients", "lastName")]
     [InlineData("patients", "middleName")]
     [InlineData("patients", "comment")]
-    public async Task Null_characters_return_400_without_creating_rows(string route, string field)
+    public async Task Create_NullCharacters_ShouldReturnBadRequestWithoutInsert(string route, string field)
     {
         var request = ValidRequest(route);
         request[field] = field == "code" ? "A0\0.00" : "Тест\0";
@@ -48,7 +48,7 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     [InlineData("sex", "POST")]
     [InlineData("birthDate", "PUT")]
     [InlineData("sex", "PUT")]
-    public async Task Missing_required_patient_fields_do_not_silently_replace_them_with_defaults(string field,
+    public async Task SavePatient_MissingRequiredFields_ShouldRejectWithoutDefaultSubstitution(string field,
         string method)
     {
         var data = ValidRequest("patients");
@@ -71,7 +71,7 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Patient_optional_fields_may_still_be_omitted_and_unknown_sex_is_explicit()
+    public async Task CreatePatient_OmittedOptionalFields_ShouldAcceptInputAndUseUnknownSex()
     {
         var response = await _client.PostAsJsonAsync("/api/patients", new
         {
@@ -88,7 +88,7 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     [InlineData("text/plain")]
     [InlineData("text/html")]
     [InlineData("application/xml")]
-    public async Task Unsupported_accept_does_not_turn_validation_or_not_found_into_server_error(string accept)
+    public async Task Send_UnsupportedAcceptHeader_ShouldPreserveValidationAndNotFoundResponses(string accept)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/diagnoses")
         {
@@ -108,7 +108,7 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Several_uploaded_files_are_rejected_without_silently_importing_only_the_first()
+    public async Task ImportDiagnoses_MultipleFiles_ShouldRejectWithoutPartialImport()
     {
         var before = await _client.GetStringAsync("/api/diagnoses");
         using var content = new MultipartFormDataContent();
@@ -120,7 +120,7 @@ public sealed class ApiInputValidationTests(HospitalApiFactory factory) : IClass
     }
 
     [Fact]
-    public async Task Invalid_prescription_text_does_not_change_record_or_history()
+    public async Task SavePrescription_InvalidText_ShouldPreserveRecordAndHistory()
     {
         var authorResponse = await _client.PostAsJsonAsync("/api/medical-workers",
             new SaveMedicalWorkerRequest("Алексей", "Проверочный", "Врач"));

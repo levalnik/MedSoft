@@ -33,14 +33,15 @@ public sealed class AuthController(
     public async Task<ActionResult<SessionDto>> LoginAsync(LoginRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.UserName) || request.UserName.Length > 128 ||
+        var userName = request.UserName?.Trim();
+        if (!AccountUserNameRules.HasValidLength(userName) ||
             string.IsNullOrEmpty(request.Password) || request.Password.Length > 128 ||
             !string.IsNullOrEmpty(request.TotpCode) ||
             request.Portal is { } portal && !Enum.IsDefined(portal))
             return InvalidCredentials();
 
-        var user = await userManager.FindByNameAsync(request.UserName.Trim());
-        if (user is null)
+        var user = await userManager.FindByNameAsync(userName!);
+        if (user is null || !user.IsActive)
         {
             failedLoginVerifier.Verify(request.Password);
             return InvalidCredentials();

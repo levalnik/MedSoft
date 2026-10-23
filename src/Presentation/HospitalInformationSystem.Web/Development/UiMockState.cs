@@ -1,7 +1,7 @@
 using System.Net;
 using HospitalInformationSystem.Contracts.Auth;
 using HospitalInformationSystem.Contracts.Diagnoses;
-using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.Security;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Contracts.Patients;
@@ -209,19 +209,6 @@ public sealed class UiMockState
         Accounts[account.Id] = account;
         Passwords[account.Id] = DemonstrationPassword;
         return account;
-    }
-
-    internal sealed record MockAccount(Guid Id, string UserName, string Role, Guid? MedicalWorkerId,
-        bool IsActive, bool IsLockedOut, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
-
-    internal sealed record MockAuditEvent(Guid EventId, DateTimeOffset EventTime, string EventType,
-        Guid? UserId, string DisplayName, string Message, Guid? TargetId, bool IsSystem = false);
-
-    internal sealed class MockMedicalRecord(MedicalRecordDto current)
-    {
-        public MedicalRecordDto Current { get; set; } = current;
-        public List<MedicalRecordHistoryEventDto> History { get; } = [];
-        public List<(DateTimeOffset At, MedicalRecordDto State)> States { get; } = [];
     }
 
     internal static MedicalWorkerRole? ToRole(string? value) => value switch
