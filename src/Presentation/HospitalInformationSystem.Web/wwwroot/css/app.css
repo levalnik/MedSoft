@@ -373,3 +373,15 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--green); fl
 @media (max-width: 640px) {
   .audit-archive { margin: 0 18px 16px; }
 }
+
+/* Мастер первоначальной настройки (N5) */
+.setup-steps { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; padding: 0 28px; margin: 0 0 18px; counter-reset: step; }
+.setup-steps li { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #9aa795; }
+.setup-steps li::before { counter-increment: step; content: counter(step); display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #cdd6c4; font-size: 10px; }
+.setup-steps li.current { color: #45554a; font-weight: 600; }
+.setup-steps li.current::before { background: var(--green); color: white; border-color: var(--green); }
+.setup-steps li.done::before { background: #eef5e9; color: #4c7653; border-color: #cfe0c3; }
+.setup-uri { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #6d7d67; overflow-wrap: anywhere; background: #f7f9f4; border: 1px solid #e4e9df; border-radius: 6px; padding: 10px 12px; margin: 10px 0 0; }
+@media (max-width: 640px) {
+  .setup-steps { padding: 0 18px; }
+}

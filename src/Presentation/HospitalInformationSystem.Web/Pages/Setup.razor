@@ -1,0 +1,315 @@
+@page "/setup"
+@layout LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using System.Net
+@using Microsoft.JSInterop
+@using HospitalInformationSystem.Contracts.Lab2
+@implements IDisposable
+@inject HospitalInformationSystem.Web.Gateways.IAuthenticationGateway Authentication
+@inject IJSRuntime Js
+
+<PageTitle>Первоначальная настройка · Учебная HIS</PageTitle>
+
+<section class="surface login-card" aria-labelledby="setup-title">
+  <div class="registry-heading">
+    <div>
+      <span class="eyebrow">УЧЕБНАЯ HIS</span>
+      <h1 id="setup-title">Первоначальная настройка</h1>
+      <p>Создание единственного администратора и подключение двухфакторного кода.</p>
+    </div>
+  </div>
+
+  @if (_checking)
+  {
+    <div class="empty-state" role="status">Проверка состояния настройки…</div>
+  }
+  else if (_step == Step.AlreadyDone)
+  {
+    <div class="empty-state">
+      <p>Первоначальная настройка уже завершена. Войдите как администратор.</p>
+      <a class="btn btn-primary" href="/admin/login">К входу администратора</a>
+    </div>
+  }
+  else if (_step == Step.Done)
+  {
+    <div class="empty-state">
+      <p>Настройка завершена. Теперь входите по паролю и коду из приложения-аутентификатора.</p>
+      <a class="btn btn-primary" href="/admin/login">К входу администратора</a>
+    </div>
+  }
+  else if (_step == Step.Credentials)
+  {
+    <ol class="setup-steps"><li class="current">Пароль</li><li>Код подтверждения</li><li>Готово</li></ol>
+    <EditForm Model="_credentials" OnValidSubmit="BeginAsync">
+      <DataAnnotationsValidator/>
+      <fieldset disabled="@_busy">
+        <div class="mr-field">
+          <label for="setup-token">Одноразовый токен настройки</label>
+          <InputText id="setup-token" class="form-control" @bind-Value="_credentials.SetupToken"
+                     autocomplete="off" autocapitalize="none" spellcheck="false"/>
+          <ValidationMessage For="() => _credentials.SetupToken"/>
+          <p class="field-hint">Токен выдаётся владельцем стенда локально и не передаётся в адресной строке.</p>
+        </div>
+        <div class="mr-field">
+          <label for="setup-password">Пароль администратора</label>
+          <InputText id="setup-password" type="password" class="form-control" @bind-Value="_credentials.Password"
+                     autocomplete="new-password" maxlength="128"/>
+          <ValidationMessage For="() => _credentials.Password"/>
+        </div>
+        <div class="mr-field">
+          <label for="setup-confirm">Повторите пароль</label>
+          <InputText id="setup-confirm" type="password" class="form-control" @bind-Value="_credentials.ConfirmPassword"
+                     autocomplete="new-password" maxlength="128"/>
+          <ValidationMessage For="() => _credentials.ConfirmPassword"/>
+        </div>
+        <p class="field-hint">Пароль: 12–128 символов, строчная и прописная латинские буквы, цифра и специальный символ.</p>
+        <ErrorAlert Message="@_error"/>
+        <button type="submit" class="btn btn-primary">@(_busy ? "Продолжаем…" : "Продолжить")</button>
+      </fieldset>
+    </EditForm>
+  }
+  else if (_step == Step.Totp)
+  {
+    <ol class="setup-steps"><li class="done">Пароль</li><li class="current">Код подтверждения</li><li>Готово</li></ol>
+    <div class="mr-field">
+      <label>Секрет для приложения-аутентификатора</label>
+      <div class="password-row">
+        <input class="form-control" readonly value="@_secret" aria-label="Секрет TOTP" onfocus="this.select()"/>
+        <button type="button" class="btn btn-outline-primary" @onclick="CopySecretAsync">
+          @(_copied ? "Скопировано" : "Копировать")
+        </button>
+      </div>
+      <p class="field-hint">Добавьте секрет вручную или отсканируйте ссылку otpauth в приложении
+        (например, Google Authenticator). Секрет не отправляется сторонним сервисам.</p>
+      <p class="setup-uri">@_authenticatorUri</p>
+    </div>
+    <EditForm Model="_confirmation" OnValidSubmit="ConfirmAsync">
+      <DataAnnotationsValidator/>
+      <fieldset disabled="@_busy">
+        <div class="mr-field">
+          <label for="setup-code">Код из приложения</label>
+          <InputText id="setup-code" class="form-control" @bind-Value="_confirmation.Code" inputmode="numeric"
+                     autocomplete="one-time-code" maxlength="6" placeholder="123456"/>
+          <ValidationMessage For="() => _confirmation.Code"/>
+        </div>
+        <ErrorAlert Message="@_error"/>
+        <button type="submit" class="btn btn-primary">@(_busy ? "Проверяем…" : "Завершить настройку")</button>
+      </fieldset>
+    </EditForm>
+  }
+</section>
+
+@code {
+  private readonly CredentialsForm _credentials = new();
+  private readonly ConfirmationForm _confirmation = new();
+  private readonly CancellationTokenSource _cancellation = new();
+  private Step _step = Step.Credentials;
+  private bool _checking = true;
+  private bool _busy;
+  private bool _copied;
+  private string? _error;
+  private Guid _challengeId;
+  private string _secret = "";
+  private string _authenticatorUri = "";
+  private string _setupToken = "";
+
+  private enum Step
+  {
+    Credentials,
+    Totp,
+    Done,
+    AlreadyDone
+  }
+
+  protected override async Task OnInitializedAsync()
+  {
+    try
+    {
+      var status = await Authentication.GetSetupStatusAsync(_cancellation.Token);
+      if (!_cancellation.IsCancellationRequested)
+      {
+        _step = status.SetupRequired ? Step.Credentials : Step.AlreadyDone;
+      }
+    }
+    catch (Exception exception) when (exception is ApiException or HttpRequestException or TaskCanceledException
+      or OperationCanceledException)
+    {
+      _error = "Не удалось проверить состояние настройки. Обновите страницу позже.";
+    }
+    finally
+    {
+      _checking = false;
+    }
+  }
+
+  private async Task BeginAsync()
+  {
+    if (_busy)
+    {
+      return;
+    }
+
+    _busy = true;
+    _error = null;
+    try
+    {
+      var request = new BeginSetupRequest(_credentials.Password, _credentials.ConfirmPassword);
+      var challenge = await Authentication.BeginSetupAsync(request, _credentials.SetupToken.Trim(),
+        _cancellation.Token);
+      if (_cancellation.IsCancellationRequested)
+      {
+        return;
+      }
+
+      _challengeId = challenge.ChallengeId;
+      _secret = challenge.SecretKey;
+      _authenticatorUri = challenge.AuthenticatorUri;
+      _setupToken = _credentials.SetupToken.Trim();
+      _confirmation.Code = "";
+      _step = Step.Totp;
+    }
+    catch (Exception exception) when (TryHandle(exception))
+    {
+    }
+    finally
+    {
+      _credentials.Password = "";
+      _credentials.ConfirmPassword = "";
+      _busy = false;
+    }
+  }
+
+  private async Task ConfirmAsync()
+  {
+    if (_busy)
+    {
+      return;
+    }
+
+    _busy = true;
+    _error = null;
+    try
+    {
+      await Authentication.ConfirmSetupAsync(new ConfirmSetupRequest(_challengeId, _confirmation.Code.Trim()),
+        _setupToken, _cancellation.Token);
+      if (_cancellation.IsCancellationRequested)
+      {
+        return;
+      }
+
+      ClearSecrets();
+      _step = Step.Done;
+    }
+    catch (Exception exception) when (TryHandle(exception))
+    {
+    }
+    finally
+    {
+      _confirmation.Code = "";
+      _busy = false;
+    }
+  }
+
+  private bool TryHandle(Exception exception)
+  {
+    if (exception is OperationCanceledException && _cancellation.IsCancellationRequested)
+    {
+      return true;
+    }
+
+    if (exception is ApiException api)
+    {
+      _error = api.StatusCode switch
+      {
+        HttpStatusCode.Conflict => "Настройка уже завершена. Перейдите к входу администратора.",
+        HttpStatusCode.Forbidden => "Токен настройки не принят. Проверьте одноразовый токен.",
+        HttpStatusCode.TooManyRequests => "Слишком много попыток. Повторите позже.",
+        _ => api.Message
+      };
+      if (api.StatusCode == HttpStatusCode.Conflict)
+      {
+        ClearSecrets();
+        _step = Step.AlreadyDone;
+      }
+
+      return true;
+    }
+
+    if (exception is HttpRequestException or TaskCanceledException)
+    {
+      _error = "Сервер недоступен. Повторите попытку.";
+      return true;
+    }
+
+    return false;
+  }
+
+  private async Task CopySecretAsync()
+  {
+    try
+    {
+      await Js.InvokeVoidAsync("navigator.clipboard.writeText", _secret);
+      _copied = true;
+    }
+    catch (JSException)
+    {
+    }
+    catch (InvalidOperationException)
+    {
+    }
+  }
+
+  private void ClearSecrets()
+  {
+    _secret = "";
+    _authenticatorUri = "";
+    _setupToken = "";
+    _challengeId = Guid.Empty;
+    _credentials.Password = "";
+    _credentials.ConfirmPassword = "";
+    _credentials.SetupToken = "";
+    _confirmation.Code = "";
+  }
+
+  public void Dispose()
+  {
+    ClearSecrets();
+    _cancellation.Cancel();
+    _cancellation.Dispose();
+  }
+
+  private sealed class CredentialsForm : IValidatableObject
+  {
+    [Required(ErrorMessage = "Введите токен настройки.")]
+    public string SetupToken { get; set; } = "";
+
+    [Required(ErrorMessage = "Укажите пароль.")]
+    [StringLength(128, MinimumLength = 12, ErrorMessage = "Пароль: от 12 до 128 символов.")]
+    public string Password { get; set; } = "";
+
+    [Required(ErrorMessage = "Повторите пароль.")]
+    public string ConfirmPassword { get; set; } = "";
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+      if (Password != ConfirmPassword)
+      {
+        yield return new ValidationResult("Пароли не совпадают.", [nameof(ConfirmPassword)]);
+      }
+
+      if (!(Password.Any(char.IsAsciiLetterUpper) && Password.Any(char.IsAsciiLetterLower)
+          && Password.Any(char.IsAsciiDigit) && Password.Any(c => !char.IsLetterOrDigit(c))))
+      {
+        yield return new ValidationResult(
+          "Пароль должен содержать строчную и прописную буквы, цифру и специальный символ.", [nameof(Password)]);
+      }
+    }
+  }
+
+  private sealed class ConfirmationForm
+  {
+    [Required(ErrorMessage = "Введите код подтверждения.")]
+    [RegularExpression("[0-9]{6}", ErrorMessage = "Код подтверждения: шесть цифр.")]
+    public string Code { get; set; } = "";
+  }
+}
