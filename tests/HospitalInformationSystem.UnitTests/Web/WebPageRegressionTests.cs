@@ -101,57 +101,52 @@ public sealed class WebPageRegressionTests
     }
 
     [Fact]
-    public async Task Medical_record_author_list_contains_only_the_signed_in_worker()
+    public async Task Entering_edit_mode_loads_only_the_diagnoses_catalog()
     {
-        var current = new MedicalWorkerDto(Guid.NewGuid(), "Иван", "Иванов", "Терапевт", false);
-        var other = new MedicalWorkerDto(Guid.NewGuid(), "Пётр", "Петров", "Хирург", false);
+        var diagnosis = new DiagnosisDefinitionDto(Guid.NewGuid(), "A00.00", "Холера");
         var state = new SessionState();
-        state.SetSession(new SessionDto(Guid.NewGuid(), "doctor", ApplicationRoles.MedicalWorker, current.Id));
-        using var http = CreateClient((request, _) => Task.FromResult(request.RequestUri!.AbsolutePath.Contains("medical-workers")
-            ? Json(new[] { current, other })
-            : Json(Array.Empty<DiagnosisDefinitionDto>())));
+        state.SetSession(new SessionDto(Guid.NewGuid(), "doctor", ApplicationRoles.MedicalWorker, Guid.NewGuid(),
+            MedicalWorkerRole.Doctor));
+        using var http = CreateClient((request, _) => request.RequestUri!.AbsolutePath.Contains("medical-workers")
+            ? throw new InvalidOperationException("The author list must no longer be requested.")
+            : Task.FromResult(Json(new[] { diagnosis })));
         using var page = new MedicalRecord();
-        Inject(page, "WorkersApi", new MedicalWorkersApiClient(http));
         Inject(page, "DiagnosesApi", new DiagnosesApiClient(http));
         Inject(page, "Session", state);
         Set(page, "_cts", new CancellationTokenSource());
 
         await InvokeAsync(page, "BeginEditAsync");
 
-        Get<IReadOnlyList<MedicalWorkerDto>>(page, "_workers").Should().Equal(current);
-        Get<Guid?>(page, "_authorId").Should().BeNull();
+        Get<IReadOnlyList<DiagnosisDefinitionDto>>(page, "_diagnoses").Should().Equal(diagnosis);
         Get<bool>(page, "_editDataLoading").Should().BeFalse();
     }
 
     [Fact]
-    public async Task Refreshing_edit_choices_clears_deleted_author_and_diagnosis()
+    public async Task Refreshing_edit_choices_clears_a_deleted_diagnosis()
     {
-        using var http = CreateClient((_, _) => Task.FromResult(Json(Array.Empty<object>())));
+        using var http = CreateClient((_, _) => Task.FromResult(Json(Array.Empty<DiagnosisDefinitionDto>())));
         using var page = new MedicalRecord();
-        Inject(page, "WorkersApi", new MedicalWorkersApiClient(http));
         Inject(page, "DiagnosesApi", new DiagnosesApiClient(http));
         Inject(page, "Session", new SessionState());
         using var cancellation = new CancellationTokenSource();
-        Set(page, "_authorId", Guid.NewGuid());
         Set(page, "_selectedDiagnosisId", Guid.NewGuid());
 
         await InvokeAsync(page, "RefreshEditDataAsync", cancellation.Token);
 
-        Get<Guid?>(page, "_authorId").Should().BeNull();
         Get<Guid?>(page, "_selectedDiagnosisId").Should().BeNull();
     }
 
     [Fact]
-    public async Task Changing_the_selected_author_cannot_submit_a_different_workers_identity()
+    public async Task A_viewer_role_cannot_create_a_record()
     {
         var state = new SessionState();
-        state.SetSession(new SessionDto(Guid.NewGuid(), "doctor", ApplicationRoles.MedicalWorker, Guid.NewGuid()));
-        using var http = CreateClient((_, _) => throw new InvalidOperationException("Another author must not be sent."));
+        state.SetSession(new SessionDto(Guid.NewGuid(), "lab", ApplicationRoles.MedicalWorker, Guid.NewGuid(),
+            MedicalWorkerRole.LaboratoryTechnician));
+        using var http = CreateClient((_, _) => throw new InvalidOperationException("A viewer must not create a record."));
         using var page = new MedicalRecord();
-        Inject(page, "RecordsApi", new MedicalRecordsApiClient(http));
+        Inject(page, "Records", new MedicalRecordsGateway(new MedicalRecordsApiClient(http), state));
         Inject(page, "Session", state);
         Set(page, "_cts", new CancellationTokenSource());
-        Set(page, "_authorId", Guid.NewGuid());
 
         await InvokeAsync(page, "CreateRecordAsync");
 
