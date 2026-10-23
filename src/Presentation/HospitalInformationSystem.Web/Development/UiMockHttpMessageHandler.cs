@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using HospitalInformationSystem.Contracts.Auth;
 using HospitalInformationSystem.Contracts.Lab2;
 
@@ -128,7 +129,7 @@ public sealed partial class UiMockHttpMessageHandler(UiMockState state) : HttpMe
         if (request.Method != HttpMethod.Post) return NotFound();
         if (!state.SetupRequired) return Error(HttpStatusCode.Conflict, "Настройка уже завершена.");
         if (!request.Headers.TryGetValues("X-Setup-Token", out var values)
-            || values.SingleOrDefault() != UiMockState.SetupToken)
+            || values.ToArray() is not [UiMockState.SetupToken])
             return Error(HttpStatusCode.Forbidden, "Для UiMock используйте демонстрационный setup-токен.");
         if (operation == "begin")
         {
@@ -185,12 +186,29 @@ public sealed partial class UiMockHttpMessageHandler(UiMockState state) : HttpMe
     private static HttpResponseMessage NoContent() => new(HttpStatusCode.NoContent);
     private static Guid Id(string value) => Guid.Parse(value);
 
-    private static Dictionary<string, string> Query(Uri uri) => uri.Query.TrimStart('?')
-        .Split('&', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Split('=', 2))
-        .ToDictionary(x => Uri.UnescapeDataString(x[0]),
-            x => x.Length > 1 ? Uri.UnescapeDataString(x[1]) : "", StringComparer.OrdinalIgnoreCase);
+    private static Dictionary<string, string> Query(Uri uri)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var part in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pair = part.Split('=', 2);
+            var key = Uri.UnescapeDataString(pair[0].Replace('+', ' '));
+            var value = pair.Length > 1 ? Uri.UnescapeDataString(pair[1].Replace('+', ' ')) : "";
+            if (!result.TryAdd(key, value)) throw new FormatException("Параметр запроса указан несколько раз.");
+        }
+        return result;
+    }
 
-    private static DateTimeOffset? Date(Dictionary<string, string> query, string key) =>
-        query.TryGetValue(key, out var value)
-            ? DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind) : null;
+    private static DateTimeOffset? Date(Dictionary<string, string> query, string key)
+    {
+        if (!query.TryGetValue(key, out var value)) return null;
+        if (!OffsetTimestamp().IsMatch(value) || !DateTimeOffset.TryParse(value,
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var instant))
+            throw new FormatException("Укажите время ISO 8601 с Z или смещением.");
+        return instant;
+    }
+
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?(?:Z|[+-]\d{2}:\d{2})$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex OffsetTimestamp();
 }

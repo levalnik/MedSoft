@@ -28,9 +28,11 @@ public sealed class MedicalWorkersController(ISender sender) : ControllerBase
     [HttpPost]
     [Authorize(Policy = ApiSecurityPolicies.Administrator)]
     [ProducesResponseType<MedicalWorkerDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public async Task<ActionResult<MedicalWorkerDto>> CreateAsync(SaveMedicalWorkerRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.Role is not null) return MedicalRoleUnavailable();
         var worker =
             await sender.Send(new CreateMedicalWorkerCommand(request.FirstName, request.LastName, request.Position),
                 cancellationToken);
@@ -39,10 +41,14 @@ public sealed class MedicalWorkersController(ISender sender) : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = ApiSecurityPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public async Task<ActionResult<MedicalWorkerDto>> UpdateAsync(Guid id, SaveMedicalWorkerRequest request,
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new UpdateMedicalWorkerCommand(id, request.FirstName, request.LastName, request.Position),
-            cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        if (request.Role is not null) return MedicalRoleUnavailable();
+        return Ok(await sender.Send(
+            new UpdateMedicalWorkerCommand(id, request.FirstName, request.LastName, request.Position), cancellationToken));
+    }
 
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = ApiSecurityPolicies.Administrator)]
@@ -52,4 +58,8 @@ public sealed class MedicalWorkersController(ISender sender) : ControllerBase
         await sender.Send(new DeleteMedicalWorkerCommand(id), cancellationToken);
         return NoContent();
     }
+
+    private ObjectResult MedicalRoleUnavailable() => Problem(statusCode: StatusCodes.Status501NotImplemented,
+        title: "Настройка медицинской роли пока недоступна.",
+        detail: "Изменения не сохранены. Сервер пока не поддерживает медицинские роли.");
 }

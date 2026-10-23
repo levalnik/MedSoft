@@ -1,5 +1,6 @@
 using System.Net;
 using HospitalInformationSystem.Contracts.Auth;
+using HospitalInformationSystem.Contracts.Lab2;
 using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Web.ApiClients;
 using HospitalInformationSystem.Web.Authentication;
@@ -12,7 +13,7 @@ public sealed class MedicalRecordsGateway(MedicalRecordsApiClient client, Sessio
         client.FindForPatientAsync(patientId, cancellationToken);
 
     public Task<MedicalRecordDto> CreateAsync(Guid patientId, CancellationToken cancellationToken = default) =>
-        client.CreateAsync(patientId, RequireAuthor(), cancellationToken);
+        client.CreateAsync(patientId, RequireAuthor(creating: true), cancellationToken);
 
     public Task AddDiagnosisAsync(Guid recordId, Guid diagnosisId, CancellationToken cancellationToken = default) =>
         client.AddDiagnosisAsync(recordId, diagnosisId, RequireAuthor(), cancellationToken);
@@ -38,13 +39,18 @@ public sealed class MedicalRecordsGateway(MedicalRecordsApiClient client, Sessio
     public Task<MedicalRecordSnapshotDto> GetSnapshotAsync(Guid recordId, DateTimeOffset at,
         CancellationToken cancellationToken = default) => client.GetSnapshotAsync(recordId, at, cancellationToken);
 
-    private Guid RequireAuthor()
+    private Guid RequireAuthor(bool creating = false)
     {
         if (session.Current is not { } current)
             throw new ApiException("Для изменения карты необходимо войти в систему.", HttpStatusCode.Unauthorized);
         if (current.Role != ApplicationRoles.MedicalWorker || current.MedicalWorkerId is not { } id || id == Guid.Empty)
             throw new ApiException("Изменять карту может только медработник с действующей учётной записью.",
                 HttpStatusCode.Forbidden);
+        if (current.MedicalWorkerRole is { } role && !(creating
+                ? role is MedicalWorkerRole.Doctor or MedicalWorkerRole.Nurse
+                : role == MedicalWorkerRole.Doctor))
+            throw new ApiException(creating ? "У текущей медицинской роли нет права создавать ЭМК."
+                : "Изменять содержимое ЭМК может только врач.", HttpStatusCode.Forbidden);
         return id;
     }
 }

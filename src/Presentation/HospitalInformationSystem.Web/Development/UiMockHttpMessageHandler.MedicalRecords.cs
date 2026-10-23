@@ -46,6 +46,7 @@ public sealed partial class UiMockHttpMessageHandler
         if (ValidateAuthor(request) is { } error) return error;
         var now = DateTimeOffset.UtcNow;
         var authorId = state.CurrentSession!.MedicalWorkerId!.Value;
+        HttpResponseMessage? response = null;
         if (path.Length == 4 && path[3] == "diagnoses" && request.Method == HttpMethod.Post)
         {
             var input = Read<AddMedicalRecordDiagnosisRequest>(body);
@@ -53,6 +54,7 @@ public sealed partial class UiMockHttpMessageHandler
             var item = new MedicalRecordDiagnosisDto(Guid.NewGuid(), diagnosis.Code, diagnosis.Name, now, authorId);
             record.Current = record.Current with { Diagnoses = record.Current.Diagnoses.Append(item).ToArray() };
             state.AppendEvent(record, "DiagnosisAdded", item.Id, Payload(new { item.Id, item.Code, item.Name }), now);
+            response = Json(item, HttpStatusCode.Created);
         }
         else if (path.Length == 5 && path[3] == "diagnoses" && request.Method == HttpMethod.Delete)
         {
@@ -70,6 +72,7 @@ public sealed partial class UiMockHttpMessageHandler
             record.Current = record.Current with { Prescriptions = record.Current.Prescriptions.Append(item).ToArray() };
             state.AppendEvent(record, "PrescriptionAdded", item.Id,
                 Payload(new { item.Id, item.Text, item.ReplacesPrescriptionId }), now);
+            response = Json(item, HttpStatusCode.Created);
         }
         else if (path.Length == 5 && path[3] == "prescriptions" && request.Method == HttpMethod.Put)
         {
@@ -85,6 +88,7 @@ public sealed partial class UiMockHttpMessageHandler
                 { Prescriptions = record.Current.Prescriptions.Append(replacement).ToArray() };
             state.AppendEvent(record, "PrescriptionAdded", replacement.Id,
                 Payload(new { replacement.Id, replacement.Text, replacement.ReplacesPrescriptionId }), now);
+            response = Json(replacement);
         }
         else if (path.Length == 6 && path[3] == "prescriptions" && path[5] == "cancel"
             && request.Method == HttpMethod.Post)
@@ -97,7 +101,7 @@ public sealed partial class UiMockHttpMessageHandler
         }
         else return NotFound();
         state.AddAudit("MedicalRecordChanged", "Изменена демонстрационная ЭМК.", record.Current.Id);
-        return NoContent();
+        return response ?? NoContent();
     }
 
     private HttpResponseMessage? ValidateAuthor(HttpRequestMessage request)

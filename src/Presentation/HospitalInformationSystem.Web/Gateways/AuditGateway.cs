@@ -5,7 +5,7 @@ namespace HospitalInformationSystem.Web.Gateways;
 
 public sealed class AuditGateway(HttpClient http) : IAuditGateway
 {
-    public Task<PagedResult<AuditEventDto>> ListAsync(AuditQuery query,
+    public async Task<PagedResult<AuditEventDto>> ListAsync(AuditQuery query,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -27,8 +27,11 @@ public sealed class AuditGateway(HttpClient http) : IAuditGateway
         }
         if (query.From is { } from) values.Add($"from={EncodeDate(from)}");
         if (query.To is { } to) values.Add($"to={EncodeDate(to)}");
-        return Lab2ApiTransport.SendAsync<PagedResult<AuditEventDto>>(http, HttpMethod.Get,
+        var page = await Lab2ApiTransport.SendAsync<PagedResult<AuditEventDto>>(http, HttpMethod.Get,
             $"api/audit?{string.Join('&', values)}", null, cancellationToken);
+        if (page.Items.Any(item => item is null))
+            throw new ApiClients.ApiException("Сервер вернул некорректный список событий аудита.");
+        return page;
     }
 
     private static string EncodeDate(DateTimeOffset value) =>

@@ -5,6 +5,7 @@ using System.Text.Json;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.Auth;
 using HospitalInformationSystem.Contracts.Lab2;
+using HospitalInformationSystem.Contracts.MedicalRecords;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
 using HospitalInformationSystem.Web.ApiClients;
 using HospitalInformationSystem.Web.Authentication;
@@ -202,6 +203,60 @@ public sealed class Lab2ContractTests
 
         (await action.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(expectedStatus);
         sends.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(MedicalWorkerRole.Doctor, true, true)]
+    [InlineData(MedicalWorkerRole.Nurse, true, false)]
+    [InlineData(MedicalWorkerRole.LaboratoryTechnician, false, false)]
+    [InlineData(MedicalWorkerRole.Other, false, false)]
+    [InlineData((MedicalWorkerRole)999, false, false)]
+    [InlineData(null, true, true)]
+    public async Task Medical_adapter_respects_known_role_permissions_and_keeps_legacy_compatibility(
+        MedicalWorkerRole? role, bool canCreate, bool canEdit)
+    {
+        var sends = 0;
+        var patientId = Guid.NewGuid();
+        using var http = CreateHttp((request, _) =>
+        {
+            sends++;
+            return Task.FromResult(request.RequestUri!.AbsolutePath.EndsWith("/medical-record",
+                StringComparison.Ordinal)
+                ? new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = JsonContent.Create(new MedicalRecordDto(Guid.NewGuid(), patientId,
+                        DateTimeOffset.UtcNow, 1, [], []))
+                }
+                : new HttpResponseMessage(HttpStatusCode.NoContent));
+        });
+        var state = new SessionState();
+        state.SetSession(new SessionDto(Guid.NewGuid(), "worker", ApplicationRoles.MedicalWorker,
+            Guid.NewGuid(), role));
+        var gateway = new MedicalRecordsGateway(new MedicalRecordsApiClient(http), state);
+
+        Func<Task> create = async () => await gateway.CreateAsync(patientId);
+        Func<Task> edit = () => gateway.AddPrescriptionAsync(Guid.NewGuid(), "Учебное назначение");
+
+        if (canCreate) await create.Should().NotThrowAsync();
+        else (await create.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        if (canEdit) await edit.Should().NotThrowAsync();
+        else (await edit.Should().ThrowAsync<ApiException>()).Which.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        sends.Should().Be((canCreate ? 1 : 0) + (canEdit ? 1 : 0));
+    }
+
+    [Fact]
+    public async Task Audit_adapter_rejects_null_event_instead_of_returning_a_broken_page()
+    {
+        using var http = CreateHttp((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""
+                {"items":[null],"page":1,"pageSize":50,"hasMore":false}
+                """, Encoding.UTF8, "application/json")
+        }));
+
+        var action = () => new AuditGateway(http).ListAsync(new AuditQuery());
+
+        await action.Should().ThrowAsync<ApiException>();
     }
 
     [Fact]

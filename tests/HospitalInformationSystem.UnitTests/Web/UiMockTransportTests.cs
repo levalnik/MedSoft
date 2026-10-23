@@ -164,8 +164,10 @@ public sealed class UiMockTransportTests
 
         var created = await accounts.CreateForWorkerAsync(worker.Id, new CreateWorkerAccountRequest("new.doctor"));
         created.GeneratedPassword.Should().HaveLength(12).And.MatchRegex("^[A-Za-z0-9]+$");
+        created.GeneratedPassword.Should().MatchRegex("[A-Z]").And.MatchRegex("[a-z]").And.MatchRegex("[0-9]");
         var reset = await accounts.ResetPasswordAsync(created.Account.Id);
         reset.GeneratedPassword.Should().HaveLength(12);
+        reset.GeneratedPassword.Should().MatchRegex("[A-Z]").And.MatchRegex("[a-z]").And.MatchRegex("[0-9]");
         reset.GeneratedPassword.Should().NotBe(created.GeneratedPassword);
         (await accounts.SetActiveAsync(created.Account.Id, false)).Account.IsActive.Should().BeFalse();
         await fixture.Auth.LogoutAsync();

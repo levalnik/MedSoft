@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
 using HospitalInformationSystem.Contracts.MedicalWorkers;
+using HospitalInformationSystem.Contracts.Lab2;
 using HospitalInformationSystem.Infrastructure.Contexts;
 using HospitalInformationSystem.Infrastructure.Initializers;
 using HospitalInformationSystem.Infrastructure.Persistence;
@@ -19,6 +20,27 @@ namespace HospitalInformationSystem.IntegrationTests;
 public sealed class MedicalWorkersApiTests(HospitalApiFactory factory) : IClassFixture<HospitalApiFactory>
 {
     private readonly HttpClient _client = factory.CreateBusinessClient();
+
+    [Fact]
+    public async Task Unsupported_medical_role_does_not_silently_create_or_update_a_worker()
+    {
+        var before = await _client.GetFromJsonAsync<MedicalWorkerDto[]>("/api/medical-workers?includeDeleted=true");
+        using var rejectedCreate = await _client.PostAsJsonAsync("/api/medical-workers",
+            new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач", MedicalWorkerRole.Doctor));
+        rejectedCreate.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
+        (await _client.GetFromJsonAsync<MedicalWorkerDto[]>("/api/medical-workers?includeDeleted=true"))!
+            .Should().BeEquivalentTo(before);
+
+        using var created = await _client.PostAsJsonAsync("/api/medical-workers",
+            new SaveMedicalWorkerRequest("Алексей", "Орлов", "Врач"));
+        created.EnsureSuccessStatusCode();
+        var worker = (await created.Content.ReadFromJsonAsync<MedicalWorkerDto>())!;
+        using var rejectedUpdate = await _client.PutAsJsonAsync($"/api/medical-workers/{worker.Id}",
+            new SaveMedicalWorkerRequest("Мария", "Петрова", "Сестра", MedicalWorkerRole.Nurse));
+        rejectedUpdate.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
+        (await _client.GetFromJsonAsync<MedicalWorkerDto>($"/api/medical-workers/{worker.Id}"))!
+            .Should().BeEquivalentTo(worker);
+    }
 
     [Fact]
     public async Task Create_update_delete_preserves_row_and_filters_default_list()

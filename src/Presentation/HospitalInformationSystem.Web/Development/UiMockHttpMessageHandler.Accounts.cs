@@ -144,7 +144,7 @@ public sealed partial class UiMockHttpMessageHandler
         || workerId.HasValue && x.MedicalWorkerId == workerId);
     private static HttpResponseMessage AccountConflict() => Error(HttpStatusCode.Conflict,
         "Логин уже используется или для медработника уже создан аккаунт.");
-    private static string GeneratePassword() => $"D1{Guid.NewGuid():N}"[..12];
+    private static string GeneratePassword() => $"Dd1{Guid.NewGuid():N}"[..12];
     private static bool ValidUserName(string? value) => value?.Trim() is { Length: >= 3 and <= 16 } text
         && text.All(x => char.IsAsciiLetterOrDigit(x) || x is '.' or '_' or '@' or '+' or '-');
 }
