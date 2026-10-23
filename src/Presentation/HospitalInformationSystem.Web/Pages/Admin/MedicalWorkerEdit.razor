@@ -1,5 +1,6 @@
 @page "/admin/medical-workers/new"
 @page "/admin/medical-workers/{Id:guid}"
+@using HospitalInformationSystem.Contracts.Lab2
 @attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @implements IDisposable
 @inject MedicalWorkersApiClient Api
@@ -30,6 +31,7 @@ else if (_model is not null)
       </h2>
       <p
         class="profile-position">@(string.IsNullOrWhiteSpace(_model.Position) ? "Должность ещё не указана" : _model.Position)</p>
+      <p class="profile-position">Роль: @MedicalRoleLabels.Describe(_model.Role)</p>
       <WorkerStatus IsDeleted="@(_worker?.IsDeleted ?? false)"/>
       <div class="profile-note">
         <Icon Name="record"/>
@@ -73,7 +75,27 @@ else if (_model is not null)
                 <option>Медицинская сестра</option>
               </datalist>
             </div>
-            <p class="field-hint">Все поля обязательны. От 3 до 24 символов в каждом поле.</p>
+            <p class="field-hint">Имя и фамилия — от 1 до 24 символов, должность — от 3 до 24 символов.</p>
+          </div>
+          <div class="form-section">
+            <div class="section-title"><span class="step-number">03</span>
+              <div><h2>Медицинская роль</h2>
+                <p>Определяет права в клинических модулях. Должность на роль не влияет.</p></div>
+            </div>
+            <div><label for="role">Роль</label>
+              <InputSelect id="role" class="form-control" @bind-Value="_model.Role">
+                <option value="@MedicalWorkerRole.Doctor">Врач</option>
+                <option value="@MedicalWorkerRole.Nurse">Медсестра / медбрат</option>
+                <option value="@MedicalWorkerRole.LaboratoryTechnician">Лаборант</option>
+                <option value="@MedicalWorkerRole.Other">Другая роль</option>
+              </InputSelect>
+              <ValidationMessage For="() => _model.Role"/>
+            </div>
+            @if (RoleChanged)
+            {
+              <p class="field-hint" role="status">После сохранения новой роли текущий вход сотрудника будет прекращён —
+                ему понадобится войти заново.</p>
+            }
           </div>
           <div class="form-actions">
             <a class="btn btn-light" href="/admin/medical-workers">Отмена</a>
@@ -109,12 +131,17 @@ else
   [Parameter] public Guid? Id { get; set; }
   private WorkerForm? _model;
   private MedicalWorkerDto? _worker;
+  private MedicalWorkerRole? _originalRole;
   private string? _error;
   private bool _loading;
   private bool _busy;
   private bool _confirmDelete;
   private bool _disposed;
   private CancellationTokenSource? _routeCancellation;
+
+  private bool RoleChanged => Id is not null && _model is not null && _originalRole is { } original
+    && original != _model.Role;
+
   protected override Task OnParametersSetAsync() => LoadAsync();
 
   private async Task LoadAsync()
@@ -138,7 +165,14 @@ else
       }
 
       _worker = worker;
-      _model = new WorkerForm { FirstName = _worker?.FirstName ?? "", LastName = _worker?.LastName ?? "", Position = _worker?.Position ?? "" };
+      _originalRole = _worker?.Role;
+      _model = new WorkerForm
+      {
+        FirstName = _worker?.FirstName ?? "",
+        LastName = _worker?.LastName ?? "",
+        Position = _worker?.Position ?? "",
+        Role = _worker?.Role ?? MedicalWorkerRole.Other
+      };
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
     {
@@ -180,7 +214,8 @@ else
       return;
     }
 
-    await Api.SaveAsync(Id, new SaveMedicalWorkerRequest(_model.FirstName, _model.LastName, _model.Position), cancellationToken);
+    await Api.SaveAsync(Id, new SaveMedicalWorkerRequest(_model.FirstName.Trim(), _model.LastName.Trim(),
+      _model.Position.Trim(), _model.Role), cancellationToken);
   });
 
   private Task DeleteAsync() => ExecuteAsync(async cancellationToken =>
@@ -253,14 +288,16 @@ else
 
   private sealed class WorkerForm
   {
-    [Required(ErrorMessage = "Укажите имя."), StringLength(24, MinimumLength = 3, ErrorMessage = "Имя: от 3 до 24 символов.")]
+    [Required(ErrorMessage = "Укажите имя."), StringLength(24, MinimumLength = 1, ErrorMessage = "Имя: от 1 до 24 символов.")]
     public string FirstName { get; set; } = "";
 
-    [Required(ErrorMessage = "Укажите фамилию."), StringLength(24, MinimumLength = 3, ErrorMessage = "Фамилия: от 3 до 24 символов.")]
+    [Required(ErrorMessage = "Укажите фамилию."), StringLength(24, MinimumLength = 1, ErrorMessage = "Фамилия: от 1 до 24 символов.")]
     public string LastName { get; set; } = "";
 
     [Required(ErrorMessage = "Укажите должность."), StringLength(24, MinimumLength = 3, ErrorMessage = "Должность: от 3 до 24 символов.")]
     public string Position { get; set; } = "";
+
+    public MedicalWorkerRole Role { get; set; } = MedicalWorkerRole.Other;
   }
 
 }

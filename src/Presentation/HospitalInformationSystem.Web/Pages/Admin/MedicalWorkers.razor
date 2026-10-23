@@ -67,6 +67,7 @@
         <tr>
           <th scope="col">Сотрудник</th>
           <th scope="col">Должность</th>
+          <th scope="col">Роль</th>
           <th scope="col">Статус</th>
           <th scope="col" class="actions-cell">Действия</th>
         </tr>
@@ -80,6 +81,7 @@
                     class="worker-fullname">@worker.LastName @worker.FirstName</span><small>Карточка сотрудника</small></span></a>
             </td>
             <td class="position-cell" data-label="Должность">@worker.Position</td>
+            <td data-label="Роль">@MedicalRoleLabels.Describe(worker.Role)</td>
             <td data-label="Статус">
               <WorkerStatus IsDeleted="worker.IsDeleted"/>
             </td>
